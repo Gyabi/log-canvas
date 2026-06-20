@@ -1,5 +1,7 @@
 <div align="center">
 
+<img src="public/logo.png" alt="log-canvas logo" width="120" />
+
 # log-canvas
 
 **An infinite canvas for log analysis — read, think, and annotate in one place.**
@@ -9,8 +11,6 @@
 [![React](https://img.shields.io/badge/React-19-61DAFB?logo=react)](https://react.dev)
 [![TypeScript](https://img.shields.io/badge/TypeScript-6.x-3178C6?logo=typescript)](https://www.typescriptlang.org)
 [![Rust](https://img.shields.io/badge/Rust-stable-CE422B?logo=rust)](https://www.rust-lang.org)
-
-<!-- TODO: add screenshot / demo gif here -->
 
 </div>
 

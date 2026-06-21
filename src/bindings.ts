@@ -9,17 +9,40 @@ export const commands = {
 	 *  Open a DLT file, build a message-offset index, and return file metadata.
 	 * 
 	 *  The indexed state is stored in [`AppState`] and referenced by subsequent
-	 *  [`get_log_rows`] calls using the returned `id` field (which equals `path`).
+	 *  [`get_log_rows`] or [`create_view`] calls using the returned `id` (= `path`).
 	 */
 	openDltFile: (path: string) => typedError<DltFileInfo, string>(__TAURI_INVOKE("open_dlt_file", { path })),
 	/**
-	 *  Fetch a contiguous range of parsed DLT rows from a previously opened file.
+	 *  Fetch a contiguous range of parsed DLT rows from a view (source or derived).
 	 * 
-	 *  `file_id` must match the `id` returned by [`open_dlt_file`].
-	 *  `offset` is the zero-based index of the first row; `count` is the page size.
+	 *  `view_id` is either a `file_id` (from [`open_dlt_file`]) or a `view_id`
+	 *  (from [`create_view`]). Derived views are checked first.
+	 *  `offset` is the zero-based row index within the view; `count` is the page size.
 	 *  Rows that fail to parse are silently skipped.
 	 */
-	getLogRows: (fileId: string, offset: number, count: number) => typedError<DltRow[], string>(__TAURI_INVOKE("get_log_rows", { fileId, offset, count })),
+	getLogRows: (viewId: string, offset: number, count: number) => typedError<DltRow[], string>(__TAURI_INVOKE("get_log_rows", { viewId, offset, count })),
+	/**
+	 *  Apply `filters` (AND-combined) to a source view and store the result as a new
+	 *  derived view identified by `view_id`.
+	 * 
+	 *  If a derived view with `view_id` already exists it is replaced.
+	 *  `source_view_id` can be a file ID (source) or another derived view ID (chaining).
+	 *  Returns the filtered row count.
+	 */
+	createView: (viewId: string, sourceViewId: string, filters: DltFilter[]) => typedError<number, string>(__TAURI_INVOKE("create_view", { viewId, sourceViewId, filters })),
+	/**
+	 *  Remove a derived view from [`AppState`], freeing its offset index.
+	 * 
+	 *  Silently succeeds if `view_id` does not exist.
+	 */
+	deleteView: (viewId: string) => typedError<null, string>(__TAURI_INVOKE("delete_view", { viewId })),
+	/**
+	 *  Given a derived view and a zero-based row index within it, return the
+	 *  corresponding zero-based row index in `source_view_id`.
+	 * 
+	 *  Used by the UI to jump to the matching row in a parent view on double-click.
+	 */
+	getSourceRowIndex: (derivedViewId: string, derivedRowIndex: number, sourceViewId: string) => typedError<number, string>(__TAURI_INVOKE("get_source_row_index", { derivedViewId, derivedRowIndex, sourceViewId })),
 };
 
 /* Types */
@@ -33,9 +56,23 @@ export type DltFileInfo = {
 	path: string,
 };
 
+/**
+ *  A single filter predicate applied to a [`DltRow`] field.
+ * 
+ *  Multiple filters are AND-combined by [`apply_filters`].
+ */
+export type DltFilter = {
+	/**  Target field: `"ecuId"`, `"appId"`, `"ctxId"`, `"level"`, or `"payload"`. */
+	field: string,
+	/**  Comparison operator: `"eq"`, `"neq"`, `"contains"`, or `"regex"`. */
+	op: string,
+	/**  Value to compare against. */
+	value: string,
+};
+
 /**  A single parsed DLT log row returned to the frontend. */
 export type DltRow = {
-	/**  Zero-based row index within the file. */
+	/**  Zero-based row index within the view. */
 	index: number,
 	/**
 	 *  Absolute timestamp in microseconds (storage-header seconds × 10⁶ + microseconds).

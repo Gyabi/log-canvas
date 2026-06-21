@@ -1,13 +1,42 @@
 use std::{collections::HashMap, fs::File, sync::Mutex};
 
-use dlt_parser::{DltFileInfo, DltFileState, DltRow};
+use dlt_parser::{DltFileInfo, DltFileState, DltFilter, DltRow};
 use tauri::State;
 
 /// Tauri-managed application state shared across all commands.
 pub struct AppState {
-    /// Index of open DLT files, keyed by absolute file path.
+    /// Raw offset index for every opened DLT file, keyed by absolute path.
     pub dlt_files: Mutex<HashMap<String, DltFileState>>,
+    /// Derived views produced by [`create_view`], keyed by a UUID assigned on creation.
+    pub dlt_views: Mutex<HashMap<String, DltView>>,
 }
+
+/// A derived view: a filtered subset of one physical DLT file's offsets.
+pub struct DltView {
+    /// Absolute path of the underlying file (used for I/O).
+    pub file_id: String,
+    /// Byte offsets of messages that passed the filter, in file order.
+    pub offsets: Vec<u64>,
+}
+
+// ── Helpers ──────────────────────────────────────────────────────────────────
+
+/// Resolve `view_id` to `(file_path, byte_offsets)`, checking derived views first.
+fn resolve_view(
+    view_id: &str,
+    files: &HashMap<String, DltFileState>,
+    views: &HashMap<String, DltView>,
+) -> Result<(String, Vec<u64>), String> {
+    if let Some(v) = views.get(view_id) {
+        return Ok((v.file_id.clone(), v.offsets.clone()));
+    }
+    if let Some(f) = files.get(view_id) {
+        return Ok((f.path.clone(), f.offsets.clone()));
+    }
+    Err(format!("unknown view: {view_id}"))
+}
+
+// ── Commands ─────────────────────────────────────────────────────────────────
 
 #[specta::specta]
 #[tauri::command]
@@ -18,7 +47,7 @@ pub fn greet(name: &str) -> String {
 /// Open a DLT file, build a message-offset index, and return file metadata.
 ///
 /// The indexed state is stored in [`AppState`] and referenced by subsequent
-/// [`get_log_rows`] calls using the returned `id` field (which equals `path`).
+/// [`get_log_rows`] or [`create_view`] calls using the returned `id` (= `path`).
 #[specta::specta]
 #[tauri::command]
 #[allow(clippy::needless_pass_by_value)]
@@ -37,34 +66,31 @@ pub fn open_dlt_file(
     Ok(DltFileInfo { id, row_count, path: path.to_owned() })
 }
 
-/// Fetch a contiguous range of parsed DLT rows from a previously opened file.
+/// Fetch a contiguous range of parsed DLT rows from a view (source or derived).
 ///
-/// `file_id` must match the `id` returned by [`open_dlt_file`].
-/// `offset` is the zero-based index of the first row; `count` is the page size.
+/// `view_id` is either a `file_id` (from [`open_dlt_file`]) or a `view_id`
+/// (from [`create_view`]). Derived views are checked first.
+/// `offset` is the zero-based row index within the view; `count` is the page size.
 /// Rows that fail to parse are silently skipped.
 #[specta::specta]
 #[tauri::command]
 #[allow(clippy::needless_pass_by_value)]
 #[allow(clippy::significant_drop_tightening)]
 pub fn get_log_rows(
-    file_id: &str,
+    view_id: &str,
     offset: u32,
     count: u32,
     state: State<'_, AppState>,
 ) -> Result<Vec<DltRow>, String> {
-    // Collect path + relevant offsets under lock, then drop the lock before file I/O.
+    // Collect path + relevant offsets under lock, then drop the locks before I/O.
     let (path, message_offsets) = {
-        let guard = state
-            .dlt_files
-            .lock()
-            .map_err(|e| format!("lock poisoned: {e}"))?;
-        let fs = guard
-            .get(file_id)
-            .ok_or_else(|| format!("unknown file: {file_id}"))?;
+        let files = state.dlt_files.lock().map_err(|e| format!("lock poisoned: {e}"))?;
+        let views = state.dlt_views.lock().map_err(|e| format!("lock poisoned: {e}"))?;
+        let (path, all_offsets) = resolve_view(view_id, &files, &views)?;
         let start = offset as usize;
-        let end = start.saturating_add(count as usize).min(fs.offsets.len());
-        let relevant = fs.offsets.get(start..end).unwrap_or(&[]).to_vec();
-        (fs.path.clone(), relevant)
+        let end = start.saturating_add(count as usize).min(all_offsets.len());
+        let relevant = all_offsets.get(start..end).unwrap_or(&[]).to_vec();
+        (path, relevant)
     };
 
     let mut file = File::open(&path).map_err(|e| format!("cannot open file: {e}"))?;
@@ -76,4 +102,87 @@ pub fn get_log_rows(
         }
     }
     Ok(rows)
+}
+
+/// Apply `filters` (AND-combined) to a source view and store the result as a new
+/// derived view identified by `view_id`.
+///
+/// If a derived view with `view_id` already exists it is replaced.
+/// `source_view_id` can be a file ID (source) or another derived view ID (chaining).
+/// Returns the filtered row count.
+#[specta::specta]
+#[tauri::command]
+#[allow(clippy::needless_pass_by_value)]
+pub fn create_view(
+    view_id: String,
+    source_view_id: String,
+    filters: Vec<DltFilter>,
+    state: State<'_, AppState>,
+) -> Result<u32, String> {
+    // Resolve source under lock, clone data, then release lock before heavy I/O.
+    let (file_id, source_offsets) = {
+        let files = state.dlt_files.lock().map_err(|e| format!("lock poisoned: {e}"))?;
+        let views = state.dlt_views.lock().map_err(|e| format!("lock poisoned: {e}"))?;
+        resolve_view(&source_view_id, &files, &views)?
+    };
+
+    let filtered = dlt_parser::apply_filters(&source_offsets, &file_id, &filters)?;
+    let row_count = u32::try_from(filtered.len()).map_err(|e| e.to_string())?;
+
+    state
+        .dlt_views
+        .lock()
+        .map_err(|e| format!("lock poisoned: {e}"))?
+        .insert(view_id, DltView { file_id, offsets: filtered });
+
+    Ok(row_count)
+}
+
+/// Remove a derived view from [`AppState`], freeing its offset index.
+///
+/// Silently succeeds if `view_id` does not exist.
+#[specta::specta]
+#[tauri::command]
+#[allow(clippy::needless_pass_by_value)]
+pub fn delete_view(view_id: String, state: State<'_, AppState>) -> Result<(), String> {
+    state
+        .dlt_views
+        .lock()
+        .map_err(|e| format!("lock poisoned: {e}"))?
+        .remove(&view_id);
+    Ok(())
+}
+
+/// Given a derived view and a zero-based row index within it, return the
+/// corresponding zero-based row index in `source_view_id`.
+///
+/// Used by the UI to jump to the matching row in a parent view on double-click.
+#[specta::specta]
+#[tauri::command]
+#[allow(clippy::needless_pass_by_value)]
+#[allow(clippy::significant_drop_tightening)]
+pub fn get_source_row_index(
+    derived_view_id: String,
+    derived_row_index: u32,
+    source_view_id: String,
+    state: State<'_, AppState>,
+) -> Result<u32, String> {
+    let (byte_offset, source_offsets) = {
+        let files = state.dlt_files.lock().map_err(|e| format!("lock poisoned: {e}"))?;
+        let views = state.dlt_views.lock().map_err(|e| format!("lock poisoned: {e}"))?;
+        let derived = views
+            .get(&derived_view_id)
+            .ok_or_else(|| format!("unknown derived view: {derived_view_id}"))?;
+        let slot = usize::try_from(derived_row_index).map_err(|e| e.to_string())?;
+        let &byte_offset = derived
+            .offsets
+            .get(slot)
+            .ok_or_else(|| format!("row {derived_row_index} out of range"))?;
+        let (_file_id, source_offsets) = resolve_view(&source_view_id, &files, &views)?;
+        (byte_offset, source_offsets)
+    };
+    let pos = source_offsets
+        .binary_search(&byte_offset)
+        .map_err(|_| format!("byte offset {byte_offset} not found in source view"))?;
+    u32::try_from(pos).map_err(|e| e.to_string())
 }

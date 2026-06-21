@@ -10,6 +10,9 @@ pub fn create_builder() -> Builder<tauri::Wry> {
         commands::greet,
         commands::open_dlt_file,
         commands::get_log_rows,
+        commands::create_view,
+        commands::delete_view,
+        commands::get_source_row_index,
     ])
 }
 
@@ -37,6 +40,7 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .manage(commands::AppState {
             dlt_files: Mutex::new(HashMap::new()),
+            dlt_views: Mutex::new(HashMap::new()),
         })
         .invoke_handler(builder.invoke_handler())
         .run(tauri::generate_context!())

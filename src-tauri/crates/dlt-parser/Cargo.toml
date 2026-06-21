@@ -6,6 +6,7 @@ edition = "2021"
 [dependencies]
 serde = { version = "1", features = ["derive"] }
 specta = "2.0.0-rc.20"
+regex = "1"
 
 [lints]
 workspace = true

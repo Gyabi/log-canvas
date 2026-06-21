@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { open } from "@tauri-apps/plugin-dialog";
+import { NodeResizer, type NodeProps } from "@xyflow/react";
 import { commands, type DltFileInfo, type DltRow } from "../bindings";
 
 const FETCH_SIZE = 100;
 
-export default function LogViewNode() {
+export default function LogViewNode({ selected }: NodeProps) {
   const [fileInfo, setFileInfo] = useState<DltFileInfo | null>(null);
   const [, setCacheVersion] = useState(0);
   const rowCache = useRef(new Map<number, DltRow>());
@@ -74,14 +75,15 @@ export default function LogViewNode() {
       className="flex flex-col overflow-hidden rounded-lg border border-neutral-600 bg-neutral-900 shadow-lg"
       style={{ width: "100%", height: "100%" }}
     >
+      <NodeResizer isVisible={selected} minWidth={400} minHeight={200} />
       {/* Header */}
-      <div className="nodrag shrink-0 flex items-center gap-2 border-b border-neutral-700 bg-neutral-800 px-3 py-2">
+      <div className="shrink-0 flex items-center gap-2 border-b border-neutral-700 bg-neutral-800 px-3 py-2 cursor-grab active:cursor-grabbing">
         <span className="flex-1 truncate text-xs font-semibold text-neutral-300">
           {fileName}
         </span>
         <button
           onClick={handleOpenFile}
-          className="shrink-0 rounded bg-blue-600 px-2 py-1 text-xs text-white hover:bg-blue-500 active:bg-blue-700"
+          className="nodrag shrink-0 rounded bg-blue-600 px-2 py-1 text-xs text-white hover:bg-blue-500 active:bg-blue-700"
         >
           open
         </button>

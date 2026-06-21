@@ -27,7 +27,7 @@ export default function Canvas() {
         type: "logView",
         position: { x: 80 + offset, y: 80 + offset },
         data: {},
-        style: { width: 720, height: 420 },
+        style: { width: 1280, height: 720 },
       },
     ]);
   }

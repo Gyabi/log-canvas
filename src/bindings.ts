@@ -5,5 +5,64 @@ import { invoke as __TAURI_INVOKE } from "@tauri-apps/api/core";
 /** Commands */
 export const commands = {
 	greet: (name: string) => __TAURI_INVOKE<string>("greet", { name }),
+	/**
+	 *  Open a DLT file, build a message-offset index, and return file metadata.
+	 * 
+	 *  The indexed state is stored in [`AppState`] and referenced by subsequent
+	 *  [`get_log_rows`] calls using the returned `id` field (which equals `path`).
+	 */
+	openDltFile: (path: string) => typedError<DltFileInfo, string>(__TAURI_INVOKE("open_dlt_file", { path })),
+	/**
+	 *  Fetch a contiguous range of parsed DLT rows from a previously opened file.
+	 * 
+	 *  `file_id` must match the `id` returned by [`open_dlt_file`].
+	 *  `offset` is the zero-based index of the first row; `count` is the page size.
+	 *  Rows that fail to parse are silently skipped.
+	 */
+	getLogRows: (fileId: string, offset: number, count: number) => typedError<DltRow[], string>(__TAURI_INVOKE("get_log_rows", { fileId, offset, count })),
 };
+
+/* Types */
+/**  Metadata returned to the frontend when a DLT file is successfully opened. */
+export type DltFileInfo = {
+	/**  File session identifier (equals the absolute file path). */
+	id: string,
+	/**  Total number of valid DLT messages found in the file. */
+	rowCount: number,
+	/**  Absolute path to the file on disk. */
+	path: string,
+};
+
+/**  A single parsed DLT log row returned to the frontend. */
+export type DltRow = {
+	/**  Zero-based row index within the file. */
+	index: number,
+	/**
+	 *  Absolute timestamp in microseconds (storage-header seconds × 10⁶ + microseconds).
+	 *  Stored as `f64` so specta exports it as TypeScript `number` without `BigInt` issues.
+	 */
+	timestampUs: number | null,
+	/**  ECU identifier (WEID field when present, otherwise storage-header ECU ID). */
+	ecuId: string,
+	/**  Application identifier from the extended header APID field. */
+	appId: string,
+	/**  Context identifier from the extended header CTID field. */
+	ctxId: string,
+	/**  Message type: `"LOG"`, `"TRACE"`, `"NETWORK"`, or `"CONTROL"`. */
+	msgType: string,
+	/**  Log level for LOG messages: `"FATAL"`, `"ERROR"`, `"WARN"`, `"INFO"`, `"DEBUG"`, `"VERBOSE"`. */
+	level: string,
+	/**  Decoded payload content. */
+	payload: string,
+};
+
+/* Tauri Specta runtime */
+async function typedError<T, E>(result: Promise<T>): Promise<{ status: "ok"; data: T } | { status: "error"; error: E }> {
+    try {
+        return { status: "ok", data: await result };
+    } catch (e) {
+        if (e instanceof Error) throw e;
+        return { status: "error", error: e as any };
+    }
+}
 

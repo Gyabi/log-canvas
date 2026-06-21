@@ -8,7 +8,7 @@ import {
   type NodeProps,
   type Node,
 } from "@xyflow/react";
-import { commands, type DltFileInfo } from "../../bindings";
+import { commands } from "../../bindings";
 import { useLogView } from "./useLogView";
 import LogViewDisplay from "./LogViewDisplay";
 import type { SourceLogViewData } from "../../types";
@@ -33,15 +33,19 @@ export default function SourceLogViewNode({
   async function handleOpenFile() {
     const path = await open({ filters: [{ name: "DLT", extensions: ["dlt"] }] });
     if (!path) return;
-    const result = await commands.openDltFile(path);
+    const fileId = crypto.randomUUID();
+    const result = await commands.openDltFile(path, fileId);
     if (result.status === "ok") {
-      const info: DltFileInfo = result.data;
-      updateNodeData(id, { viewId: info.id, rowCount: info.rowCount });
+      updateNodeData(id, {
+        viewId: result.data.id,
+        filePath: result.data.path,
+        rowCount: result.data.rowCount,
+      });
     }
   }
 
-  const fileName = data.viewId
-    ? (data.viewId.split("/").pop() ?? data.viewId)
+  const fileName = data.filePath
+    ? (data.filePath.split("/").pop() ?? data.filePath)
     : "file is not selected";
 
   return (

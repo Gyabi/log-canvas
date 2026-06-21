@@ -35,7 +35,7 @@ export default function LogViewDisplay({
   selectedRows,
   toggleSelect,
   clearSelection,
-  jumpToRow,
+  scrollToIndex,
   emptyMessage,
   marks,
   onRowDoubleClick,
@@ -80,7 +80,8 @@ export default function LogViewDisplay({
   function handleJumpKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
     if (e.key === "Enter") {
       const n = parseInt(jumpValue, 10);
-      if (!Number.isNaN(n)) jumpToRow(n);
+      // User enters 1-based row number; scrollToIndex is 0-based.
+      if (!Number.isNaN(n)) scrollToIndex(n - 1);
       setJumpInputVisible(false);
       setJumpValue("");
     } else if (e.key === "Escape") {

@@ -7,7 +7,13 @@ import {
   type NodeProps,
   type Node,
 } from "@xyflow/react";
-import type { MarkColor, MarkingRule, MarkingNodeData, DerivedLogViewData } from "../../types";
+import { Copy } from "lucide-react";
+import type {
+  MarkColor,
+  MarkingRule,
+  MarkingNodeData,
+  DerivedLogViewData,
+} from "../../types";
 
 export type { MarkingNodeData };
 export type MarkingNodeType = Node<MarkingNodeData, "marking">;
@@ -21,38 +27,43 @@ const FIELD_OPTIONS = [
 ] as const;
 
 const OP_OPTIONS = [
-  { value: "eq", label: "= (完全一致)" },
-  { value: "neq", label: "≠ (除外)" },
-  { value: "contains", label: "∋ (含む)" },
-  { value: "regex", label: "~ (正規表現)" },
+  { value: "eq", label: "= (equal)" },
+  { value: "neq", label: "≠ (not equal)" },
+  { value: "contains", label: "∋ (contains)" },
+  { value: "regex", label: "~ (regex)" },
 ] as const;
 
 const COLOR_OPTIONS: { value: MarkColor; dot: string }[] = [
-  { value: "red",    dot: "bg-red-500" },
+  { value: "red", dot: "bg-red-500" },
   { value: "yellow", dot: "bg-amber-400" },
-  { value: "green",  dot: "bg-green-500" },
-  { value: "blue",   dot: "bg-blue-500" },
+  { value: "green", dot: "bg-green-500" },
+  { value: "blue", dot: "bg-blue-500" },
   { value: "purple", dot: "bg-purple-500" },
 ];
 
 const DOT: Record<MarkColor, string> = {
-  red:    "bg-red-500",
+  red: "bg-red-500",
   yellow: "bg-amber-400",
-  green:  "bg-green-500",
-  blue:   "bg-blue-500",
+  green: "bg-green-500",
+  blue: "bg-blue-500",
   purple: "bg-purple-500",
 };
 
 function chipLabel(r: MarkingRule): string {
-  const field = FIELD_OPTIONS.find((o) => o.value === r.field)?.label ?? r.field;
-  const op = OP_OPTIONS.find((o) => o.value === r.op)?.label?.split(" ")[0] ?? r.op;
+  const field =
+    FIELD_OPTIONS.find((o) => o.value === r.field)?.label ?? r.field;
+  const op =
+    OP_OPTIONS.find((o) => o.value === r.op)?.label?.split(" ")[0] ?? r.op;
   return `${field} ${op} ${r.value}`;
 }
 
-type NodeViewData = { viewId?: string; rowCount?: number };
-
-export default function MarkingNode({ id, data, selected }: NodeProps<MarkingNodeType>) {
-  const { getNodes, getEdges, addNodes, addEdges, updateNodeData } = useReactFlow();
+export default function MarkingNode({
+  id,
+  data,
+  selected,
+}: NodeProps<MarkingNodeType>) {
+  const { getNodes, getEdges, addNodes, addEdges, updateNodeData } =
+    useReactFlow();
 
   const [showAdd, setShowAdd] = useState(false);
   const [newField, setNewField] = useState("level");
@@ -61,20 +72,24 @@ export default function MarkingNode({ id, data, selected }: NodeProps<MarkingNod
   const [newColor, setNewColor] = useState<MarkColor>("red");
   const [error, setError] = useState<string | null>(null);
 
-  // Reactively read the connected derived node's applied rule count.
   const liveRuleCount = useStore((s) => {
     const outEdge = s.edges.find((e) => e.source === id);
     if (!outEdge) return null;
     const node = s.nodes.find((n) => n.id === outEdge.target);
-    const d = node?.data as { markingRules?: unknown[] } | undefined;
-    return d?.markingRules?.length ?? null;
+    return (
+      (node?.data as { markingRules?: unknown[] } | undefined)?.markingRules
+        ?.length ?? null
+    );
   });
 
   function addRule() {
     const trimmed = newValue.trim();
     if (!trimmed) return;
     updateNodeData(id, {
-      rules: [...data.rules, { field: newField, op: newOp, value: trimmed, color: newColor }],
+      rules: [
+        ...data.rules,
+        { field: newField, op: newOp, value: trimmed, color: newColor },
+      ],
     });
     setNewValue("");
     setShowAdd(false);
@@ -84,54 +99,48 @@ export default function MarkingNode({ id, data, selected }: NodeProps<MarkingNod
     updateNodeData(id, { rules: data.rules.filter((_, i) => i !== index) });
   }
 
-  async function handleCreateOutput() {
+  function handleDuplicate() {
+    const selfNode = getNodes().find((n) => n.id === id);
+    addNodes([
+      {
+        id: `marking-${crypto.randomUUID()}`,
+        type: "marking",
+        position: {
+          x: (selfNode?.position.x ?? 0) + 24,
+          y: (selfNode?.position.y ?? 0) + 24,
+        },
+        data: { rules: data.rules.map((r) => ({ ...r })) },
+      },
+    ]);
+  }
+
+  function handleCreateOutput() {
     setError(null);
     const edges = getEdges();
+
+    if (edges.some((e) => e.source === id)) return;
+
     const nodes = getNodes();
-
-    const incomingEdge = edges.find((e) => e.target === id);
-    if (!incomingEdge) {
-      setError("Connect an input node first");
-      return;
-    }
-    const sourceNode = nodes.find((n) => n.id === incomingEdge.source);
-    const sourceData = sourceNode?.data as NodeViewData | undefined;
-    if (!sourceData?.viewId) {
-      setError("Open a DLT file on the source node first");
-      return;
-    }
-
-    const outgoingEdge = edges.find((e) => e.source === id);
-    const existingDerived = outgoingEdge
-      ? nodes.find((n) => n.id === outgoingEdge.target)
-      : undefined;
-
-    if (existingDerived) {
-      updateNodeData(existingDerived.id, { markingRules: data.rules });
-    } else {
-      const derivedId = `derived-${crypto.randomUUID()}`;
-      const selfNode = nodes.find((n) => n.id === id);
-      const rowCount = sourceData.rowCount ?? 0;
-      addNodes([
-        {
-          id: derivedId,
-          type: "derivedLogView",
-          position: {
-            x: (selfNode?.position.x ?? 0) + 320,
-            y: selfNode?.position.y ?? 0,
-          },
-          data: {
-            sourceViewId: sourceData.viewId,
-            viewId: sourceData.viewId,
-            rowCount,
-            label: "Marked View",
-            markingRules: data.rules,
-          } satisfies DerivedLogViewData,
-          style: { width: 1280, height: 720 },
+    const selfNode = nodes.find((n) => n.id === id);
+    const derivedId = `derived-${crypto.randomUUID()}`;
+    addNodes([
+      {
+        id: derivedId,
+        type: "derivedLogView",
+        position: {
+          x: (selfNode?.position.x ?? 0) + 320,
+          y: selfNode?.position.y ?? 0,
         },
-      ]);
-      addEdges([{ id: `edge-${id}-${derivedId}`, source: id, target: derivedId }]);
-    }
+        data: {
+          rowCount: 0,
+          label: "Marked View",
+        } satisfies DerivedLogViewData,
+        style: { width: 1280, height: 720 },
+      },
+    ]);
+    addEdges([
+      { id: `edge-${id}-${derivedId}`, source: id, target: derivedId },
+    ]);
   }
 
   return (
@@ -144,12 +153,21 @@ export default function MarkingNode({ id, data, selected }: NodeProps<MarkingNod
       <Handle type="source" position={Position.Right} />
 
       <div className="flex items-center gap-2 border-b border-neutral-700 bg-neutral-800 px-3 py-2">
-        <span className="text-xs font-semibold text-neutral-300">🎨 Marking</span>
+        <span className="text-xs font-semibold text-neutral-300">
+          🎨 Marking
+        </span>
         {liveRuleCount !== null && (
-          <span className="ml-auto rounded bg-violet-900/60 px-1.5 py-0.5 text-[10px] font-medium text-violet-300">
+          <span className="rounded bg-violet-900/60 px-1.5 py-0.5 text-[10px] font-medium text-violet-300">
             {liveRuleCount} rule{liveRuleCount !== 1 ? "s" : ""} applied
           </span>
         )}
+        <button
+          onClick={handleDuplicate}
+          className="nodrag ml-auto text-neutral-500 hover:text-neutral-300"
+          title="Duplicate"
+        >
+          <Copy size={12} />
+        </button>
       </div>
 
       <div className="nodrag space-y-2 p-3">
@@ -160,7 +178,9 @@ export default function MarkingNode({ id, data, selected }: NodeProps<MarkingNod
                 key={i}
                 className="flex items-center gap-1 rounded bg-neutral-700 px-2 py-0.5 text-xs text-neutral-200"
               >
-                <span className={`inline-block h-2 w-2 rounded-full ${DOT[r.color]}`} />
+                <span
+                  className={`inline-block h-2 w-2 rounded-full ${DOT[r.color]}`}
+                />
                 {chipLabel(r)}
                 <button
                   onClick={() => removeRule(i)}
@@ -178,19 +198,23 @@ export default function MarkingNode({ id, data, selected }: NodeProps<MarkingNod
             <select
               value={newField}
               onChange={(e) => setNewField(e.target.value)}
-              className="w-full rounded bg-neutral-700 px-2 py-1 text-xs text-neutral-200"
+              className="w-full rounded bg-neutral-700 px-2 py-1 text-xs text-violet-700 font-semibold"
             >
               {FIELD_OPTIONS.map((o) => (
-                <option key={o.value} value={o.value}>{o.label}</option>
+                <option key={o.value} value={o.value}>
+                  {o.label}
+                </option>
               ))}
             </select>
             <select
               value={newOp}
               onChange={(e) => setNewOp(e.target.value)}
-              className="w-full rounded bg-neutral-700 px-2 py-1 text-xs text-neutral-200"
+              className="w-full rounded bg-neutral-700 px-2 py-1 text-xs text-violet-700 font-semibold"
             >
               {OP_OPTIONS.map((o) => (
-                <option key={o.value} value={o.value}>{o.label}</option>
+                <option key={o.value} value={o.value}>
+                  {o.label}
+                </option>
               ))}
             </select>
             <input
@@ -211,7 +235,9 @@ export default function MarkingNode({ id, data, selected }: NodeProps<MarkingNod
                   key={c.value}
                   onClick={() => setNewColor(c.value)}
                   className={`h-5 w-5 rounded-full ${c.dot} ${
-                    newColor === c.value ? "ring-2 ring-white ring-offset-1 ring-offset-neutral-800" : ""
+                    newColor === c.value
+                      ? "ring-2 ring-white ring-offset-1 ring-offset-neutral-800"
+                      : ""
                   }`}
                 />
               ))}
@@ -240,9 +266,7 @@ export default function MarkingNode({ id, data, selected }: NodeProps<MarkingNod
           </button>
         )}
 
-        {error && (
-          <p className="text-xs text-red-400">{error}</p>
-        )}
+        {error && <p className="text-xs text-red-400">{error}</p>}
 
         <div className="border-t border-neutral-700 pt-2">
           <button

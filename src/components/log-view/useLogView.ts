@@ -109,11 +109,6 @@ export function useLogView(viewId: string | undefined, rowCount: number) {
     lastSelectedRef.current = null;
   }
 
-  function jumpToRow(n: number) {
-    const idx = Math.max(0, Math.min(n - 1, rowCount - 1));
-    virtualizer.scrollToIndex(idx, { align: "start" });
-  }
-
   function scrollToIndex(n: number) {
     const idx = Math.max(0, Math.min(n, rowCount - 1));
     virtualizer.scrollToIndex(idx, { align: "center" });
@@ -130,7 +125,6 @@ export function useLogView(viewId: string | undefined, rowCount: number) {
     selectedRows,
     toggleSelect,
     clearSelection,
-    jumpToRow,
     scrollToIndex,
   };
 }

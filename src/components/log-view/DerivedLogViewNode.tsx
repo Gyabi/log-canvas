@@ -26,10 +26,9 @@ export default function DerivedLogViewNode({
 }: NodeProps<DerivedLogViewNodeType>) {
   useDerivedViewSync(id, data);
 
-  const { getNodes, updateNodeData } = useReactFlow();
+  const { getNodes, getEdges, updateNodeData } = useReactFlow();
   const lv = useLogView(data.viewId, data.rowCount);
 
-  // Jump when another node sends us a jumpRequest.
   useEffect(() => {
     if (data.jumpRequest == null) return;
     lv.scrollToIndex(data.jumpRequest);
@@ -42,40 +41,51 @@ export default function DerivedLogViewNode({
     return computeMarks(lv.rowCache, data.markingRules);
   }, [lv.rowCache, data.markingRules]);
 
-  // Double-click: find parent log-view node and request a jump to the source row.
+  // Double-click: find the upstream SourceLogViewNode through condition nodes
+  // and send a jumpRequest so it scrolls to the same source row.
   const handleRowDoubleClick = useCallback(
     async (derivedRowIndex: number) => {
-      if (!data.sourceViewId || !data.viewId) return;
+      if (!data.viewId) return;
 
-      // If this view has no filter applied (viewId === sourceViewId), the row
-      // index is already correct in the source — just forward the request.
-      if (data.viewId === data.sourceViewId) {
-        const sourceNode = getNodes().find(
-          (n) => (n.data as { viewId?: string }).viewId === data.sourceViewId,
-        );
-        if (sourceNode) {
-          updateNodeData(sourceNode.id, { jumpRequest: derivedRowIndex });
+      const nodes = getNodes();
+      const edges = getEdges();
+      const incomingEdges = edges.filter((e) => e.target === id);
+
+      // Traverse condition node → upstream log view
+      let upstreamViewId: string | undefined;
+      let upstreamNodeId: string | undefined;
+      for (const condEdge of incomingEdges) {
+        const condNode = nodes.find((n) => n.id === condEdge.source);
+        if (!condNode) continue;
+        const logViewEdge = edges.find((e) => e.target === condNode.id);
+        const logViewNode = logViewEdge
+          ? nodes.find((n) => n.id === logViewEdge.source)
+          : undefined;
+        const vid = (logViewNode?.data as { viewId?: string } | undefined)?.viewId;
+        if (vid && logViewNode) {
+          upstreamViewId = vid;
+          upstreamNodeId = logViewNode.id;
+          break;
         }
+      }
+      if (!upstreamViewId || !upstreamNodeId) return;
+
+      if (data.viewId === upstreamViewId) {
+        // No filtering active — row index is the same in the upstream view.
+        updateNodeData(upstreamNodeId, { jumpRequest: derivedRowIndex });
         return;
       }
 
-      // Derive view is filtered: ask Rust to map the filtered index to its
-      // position in the source view.
+      // Filtered view: ask Rust to map the derived row index to the source row index.
       const result = await commands.getSourceRowIndex(
         data.viewId,
         derivedRowIndex,
-        data.sourceViewId,
+        upstreamViewId,
       );
       if (result.status !== "ok") return;
-
-      const sourceNode = getNodes().find(
-        (n) => (n.data as { viewId?: string }).viewId === data.sourceViewId,
-      );
-      if (sourceNode) {
-        updateNodeData(sourceNode.id, { jumpRequest: result.data });
-      }
+      updateNodeData(upstreamNodeId, { jumpRequest: result.data });
     },
-    [data.viewId, data.sourceViewId, getNodes, updateNodeData],
+    [id, data.viewId, getNodes, getEdges, updateNodeData],
   );
 
   return (
@@ -84,13 +94,13 @@ export default function DerivedLogViewNode({
       style={{ width: "100%", height: "100%" }}
     >
       <NodeResizer isVisible={selected} minWidth={400} minHeight={200} />
+      {/* target only: DerivedLogViewNode is always the terminal node in the graph */}
       <Handle type="target" position={Position.Left} />
-      <Handle type="source" position={Position.Right} />
 
       <div className="shrink-0 flex items-center gap-2 border-b border-violet-800 bg-violet-950 px-3 py-2 cursor-grab active:cursor-grabbing">
         <span className="text-xs text-violet-400">▶ derive</span>
         <span className="flex-1 truncate text-xs font-semibold text-neutral-300">
-          {data.label ?? data.viewId.slice(0, 8)}
+          {data.label ?? (data.viewId?.slice(0, 8) ?? "…")}
         </span>
         <span className="shrink-0 text-xs text-neutral-500">
           {data.rowCount.toLocaleString()} rows

@@ -22,10 +22,10 @@ const FIELD_OPTIONS = [
 ] as const;
 
 const OP_OPTIONS = [
-  { value: "eq", label: "= (完全一致)" },
-  { value: "neq", label: "≠ (除外)" },
-  { value: "contains", label: "∋ (含む)" },
-  { value: "regex", label: "~ (正規表現)" },
+  { value: "eq", label: "= (equal)" },
+  { value: "neq", label: "≠ (not equal)" },
+  { value: "contains", label: "∋ (contains)" },
+  { value: "regex", label: "~ (regex)" },
 ] as const;
 
 function chipLabel(f: FilterNodeData["filters"][number]): string {
@@ -169,7 +169,7 @@ export default function FilterNode({
             <select
               value={newField}
               onChange={(e) => setNewField(e.target.value)}
-              className="w-full rounded bg-neutral-700 px-2 py-1 text-xs text-neutral-200"
+              className="w-full rounded bg-neutral-700 px-2 py-1 text-xs text-violet-700 font-semibold"
             >
               {FIELD_OPTIONS.map((o) => (
                 <option key={o.value} value={o.value}>
@@ -180,7 +180,7 @@ export default function FilterNode({
             <select
               value={newOp}
               onChange={(e) => setNewOp(e.target.value)}
-              className="w-full rounded bg-neutral-700 px-2 py-1 text-xs text-neutral-200"
+              className="w-full rounded bg-neutral-700 px-2 py-1 text-xs text-violet-700 font-semibold"
             >
               {OP_OPTIONS.map((o) => (
                 <option key={o.value} value={o.value}>

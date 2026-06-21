@@ -778,6 +778,7 @@ dependencies = [
 name = "dlt-parser"
 version = "0.1.0"
 dependencies = [
+ "regex",
  "serde",
  "specta",
 ]

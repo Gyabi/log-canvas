@@ -89,8 +89,25 @@ log-canvas/
 │   ├── capabilities/     # Tauri permission definitions
 │   └── tauri.conf.json
 ├── docs/                 # Design documents & requirements
+├── tools/                # Development utilities
+│   └── dlt-sample-gen/   # DLT sample file generator
 └── public/
 ```
+
+## Tools
+
+### `tools/dlt-sample-gen` — DLT Sample File Generator
+
+Generates a real `.dlt` binary file using [dlt-daemon](https://github.com/COVESA/dlt-daemon) running inside Docker. Use this to produce test data for development without needing a real DLT-capable device.
+
+**Requirements:** Docker + Docker Compose
+
+```bash
+cd tools/dlt-sample-gen
+docker compose up --build
+```
+
+The generated file contains messages from multiple App IDs (APP1, APP2, NET, SYS) and Context IDs at various log levels (INFO, WARN, ERROR, FATAL, DEBUG, VERBOSE). The file follows the DLT Storage Format specification.
 
 ## Contributing
 

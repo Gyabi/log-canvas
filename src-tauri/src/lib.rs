@@ -1,14 +1,16 @@
-use tauri_specta::{collect_commands, Builder};
+mod commands;
 
-#[specta::specta]
-#[tauri::command]
-fn greet(name: &str) -> String {
-    format!("Hello, {}! You've been greeted from Rust!", name)
-}
+use std::{collections::HashMap, sync::Mutex};
+
+use tauri_specta::{collect_commands, Builder};
 
 #[must_use]
 pub fn create_builder() -> Builder<tauri::Wry> {
-    Builder::<tauri::Wry>::new().commands(collect_commands![greet])
+    Builder::<tauri::Wry>::new().commands(collect_commands![
+        commands::greet,
+        commands::open_dlt_file,
+        commands::get_log_rows,
+    ])
 }
 
 /// # Panics
@@ -32,6 +34,10 @@ pub fn run() {
     let builder = create_builder();
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_dialog::init())
+        .manage(commands::AppState {
+            dlt_files: Mutex::new(HashMap::new()),
+        })
         .invoke_handler(builder.invoke_handler())
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

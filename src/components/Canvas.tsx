@@ -8,51 +8,50 @@ import {
   useEdgesState,
   type Node,
 } from "@xyflow/react";
-import PlaceholderNode from "./PlaceholderNode";
+import LogViewNode from "./LogViewNode";
 
-const nodeTypes = { placeholder: PlaceholderNode };
-
-const initialNodes: Node[] = [
-  {
-    id: "1",
-    type: "placeholder",
-    position: { x: 80, y: 80 },
-    data: { label: "system.dlt" },
-  },
-  {
-    id: "2",
-    type: "placeholder",
-    position: { x: 420, y: 140 },
-    data: { label: "app.dlt" },
-  },
-  {
-    id: "3",
-    type: "placeholder",
-    position: { x: 200, y: 340 },
-    data: { label: "network.dlt" },
-  },
-];
+const nodeTypes = { logView: LogViewNode };
 
 export default function Canvas() {
-  const [nodes, , onNodesChange] = useNodesState(initialNodes);
+  const [nodes, setNodes, onNodesChange] = useNodesState<Node>([]);
   const [edges, , onEdgesChange] = useEdgesState([]);
 
+  function addLogViewNode() {
+    const id = `logview-${crypto.randomUUID()}`;
+
+    const offset = (nodes.length % 5) * 40;
+    setNodes((prev) => [
+      ...prev,
+      {
+        id,
+        type: "logView",
+        position: { x: 80 + offset, y: 80 + offset },
+        data: {},
+        style: { width: 1280, height: 720 },
+      },
+    ]);
+  }
+
   return (
-    <div className="w-full h-full">
+    <div className="relative h-full w-full">
       <ReactFlow
         nodes={nodes}
         edges={edges}
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
         nodeTypes={nodeTypes}
-        fitView
         panOnDrag
         zoomOnScroll
         zoomOnPinch
         minZoom={0.1}
         maxZoom={4}
       >
-        <Background variant={BackgroundVariant.Dots} gap={20} size={1} color="#404040" />
+        <Background
+          variant={BackgroundVariant.Dots}
+          gap={20}
+          size={1}
+          color="#404040"
+        />
         <Controls />
         <MiniMap
           nodeColor="#525252"
@@ -60,6 +59,12 @@ export default function Canvas() {
           style={{ background: "#1a1a1a" }}
         />
       </ReactFlow>
+      <button
+        onClick={addLogViewNode}
+        className="absolute left-4 top-4 z-10 rounded bg-neutral-700 px-3 py-2 text-sm text-neutral-200 shadow hover:bg-neutral-600"
+      >
+        + add log file
+      </button>
     </div>
   );
 }

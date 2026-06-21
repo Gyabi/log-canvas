@@ -11,10 +11,12 @@ import {
   type Connection,
 } from "@xyflow/react";
 import { FileText, SlidersHorizontal, Palette } from "lucide-react";
+import { commands } from "../bindings";
 import SourceLogViewNode from "./log-view/SourceLogViewNode";
 import DerivedLogViewNode from "./log-view/DerivedLogViewNode";
 import FilterNode from "./condition/FilterNode";
 import MarkingNode from "./condition/MarkingNode";
+import type { SourceLogViewData, DerivedLogViewData } from "../types";
 
 const nodeTypes = {
   sourceLogView: SourceLogViewNode,
@@ -54,6 +56,18 @@ export default function Canvas() {
 
   function onConnect(params: Connection) {
     setEdges((eds) => addEdge(params, eds));
+  }
+
+  function onNodesDelete(deleted: Node[]) {
+    for (const node of deleted) {
+      if (node.type === "sourceLogView") {
+        const viewId = (node.data as SourceLogViewData).viewId;
+        if (viewId) void commands.closeDltFile(viewId);
+      } else if (node.type === "derivedLogView") {
+        const viewId = (node.data as DerivedLogViewData).viewId;
+        if (viewId) void commands.deleteView(viewId);
+      }
+    }
   }
 
   function addSourceLogViewNode() {
@@ -107,6 +121,7 @@ export default function Canvas() {
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}
+        onNodesDelete={onNodesDelete}
         nodeTypes={nodeTypes}
         panOnDrag
         zoomOnScroll

@@ -9,6 +9,7 @@ pub fn create_builder() -> Builder<tauri::Wry> {
     Builder::<tauri::Wry>::new().commands(collect_commands![
         commands::greet,
         commands::open_dlt_file,
+        commands::close_dlt_file,
         commands::get_log_rows,
         commands::create_view,
         commands::delete_view,

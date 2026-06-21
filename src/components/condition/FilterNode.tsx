@@ -7,7 +7,7 @@ import {
   type NodeProps,
   type Node,
 } from "@xyflow/react";
-import { commands } from "../../bindings";
+import { Copy } from "lucide-react";
 import type { FilterNodeData, DerivedLogViewData } from "../../types";
 
 export type { FilterNodeData };
@@ -29,15 +29,20 @@ const OP_OPTIONS = [
 ] as const;
 
 function chipLabel(f: FilterNodeData["filters"][number]): string {
-  const field = FIELD_OPTIONS.find((o) => o.value === f.field)?.label ?? f.field;
-  const op = OP_OPTIONS.find((o) => o.value === f.op)?.label?.split(" ")[0] ?? f.op;
+  const field =
+    FIELD_OPTIONS.find((o) => o.value === f.field)?.label ?? f.field;
+  const op =
+    OP_OPTIONS.find((o) => o.value === f.op)?.label?.split(" ")[0] ?? f.op;
   return `${field} ${op} ${f.value}`;
 }
 
-type NodeViewId = { viewId?: string };
-
-export default function FilterNode({ id, data, selected }: NodeProps<FilterNodeType>) {
-  const { getNodes, getEdges, addNodes, addEdges, updateNodeData } = useReactFlow();
+export default function FilterNode({
+  id,
+  data,
+  selected,
+}: NodeProps<FilterNodeType>) {
+  const { getNodes, getEdges, addNodes, addEdges, updateNodeData } =
+    useReactFlow();
 
   const [showAdd, setShowAdd] = useState(false);
   const [newField, setNewField] = useState("ecuId");
@@ -45,21 +50,21 @@ export default function FilterNode({ id, data, selected }: NodeProps<FilterNodeT
   const [newValue, setNewValue] = useState("");
   const [error, setError] = useState<string | null>(null);
 
-  // Reactively read the connected derived node's rowCount from the RF store.
-  // Updates automatically whenever useDerivedViewSync changes the derived node.
   const liveRowCount = useStore((s) => {
     const outEdge = s.edges.find((e) => e.source === id);
     if (!outEdge) return null;
     const node = s.nodes.find((n) => n.id === outEdge.target);
-    const d = node?.data as { rowCount?: number } | undefined;
-    return d?.rowCount ?? null;
+    return (node?.data as { rowCount?: number } | undefined)?.rowCount ?? null;
   });
 
   function addFilter() {
     const trimmed = newValue.trim();
     if (!trimmed) return;
     updateNodeData(id, {
-      filters: [...data.filters, { field: newField, op: newOp, value: trimmed }],
+      filters: [
+        ...data.filters,
+        { field: newField, op: newOp, value: trimmed },
+      ],
     });
     setNewValue("");
     setShowAdd(false);
@@ -69,65 +74,49 @@ export default function FilterNode({ id, data, selected }: NodeProps<FilterNodeT
     updateNodeData(id, { filters: data.filters.filter((_, i) => i !== index) });
   }
 
-  async function handleCreateOutput() {
+  function handleDuplicate() {
+    const selfNode = getNodes().find((n) => n.id === id);
+    addNodes([
+      {
+        id: `filter-${crypto.randomUUID()}`,
+        type: "filter",
+        position: {
+          x: (selfNode?.position.x ?? 0) + 24,
+          y: (selfNode?.position.y ?? 0) + 24,
+        },
+        data: { filters: data.filters.map((f) => ({ ...f })) },
+      },
+    ]);
+  }
+
+  function handleCreateOutput() {
     setError(null);
     const edges = getEdges();
+
+    // If already connected to a derived node, nothing to do — useDerivedViewSync handles updates.
+    if (edges.some((e) => e.source === id)) return;
+
     const nodes = getNodes();
-
-    const incomingEdge = edges.find((e) => e.target === id);
-    if (!incomingEdge) {
-      setError("Connect an input node first");
-      return;
-    }
-    const sourceNode = nodes.find((n) => n.id === incomingEdge.source);
-    const sourceViewId = (sourceNode?.data as NodeViewId)?.viewId;
-    if (!sourceViewId) {
-      setError("Open a DLT file on the source node first");
-      return;
-    }
-
-    const outgoingEdge = edges.find((e) => e.source === id);
-    const existingDerived = outgoingEdge
-      ? nodes.find((n) => n.id === outgoingEdge.target)
-      : undefined;
-    const oldViewId = (existingDerived?.data as NodeViewId)?.viewId;
-
-    const newViewId = crypto.randomUUID();
-
-    if (oldViewId && oldViewId !== sourceViewId) {
-      await commands.deleteView(oldViewId);
-    }
-
-    const result = await commands.createView(newViewId, sourceViewId, data.filters);
-    if (result.status !== "ok") {
-      setError(result.error);
-      return;
-    }
-
-    if (existingDerived) {
-      updateNodeData(existingDerived.id, { viewId: newViewId, rowCount: result.data });
-    } else {
-      const selfNode = nodes.find((n) => n.id === id);
-      const derivedId = `derived-${crypto.randomUUID()}`;
-      addNodes([
-        {
-          id: derivedId,
-          type: "derivedLogView",
-          position: {
-            x: (selfNode?.position.x ?? 0) + 320,
-            y: selfNode?.position.y ?? 0,
-          },
-          data: {
-            sourceViewId,
-            viewId: newViewId,
-            rowCount: result.data,
-            label: "Filtered View",
-          } satisfies DerivedLogViewData,
-          style: { width: 1280, height: 720 },
+    const selfNode = nodes.find((n) => n.id === id);
+    const derivedId = `derived-${crypto.randomUUID()}`;
+    addNodes([
+      {
+        id: derivedId,
+        type: "derivedLogView",
+        position: {
+          x: (selfNode?.position.x ?? 0) + 320,
+          y: selfNode?.position.y ?? 0,
         },
-      ]);
-      addEdges([{ id: `edge-${id}-${derivedId}`, source: id, target: derivedId }]);
-    }
+        data: {
+          rowCount: 0,
+          label: "Filtered View",
+        } satisfies DerivedLogViewData,
+        style: { width: 1280, height: 720 },
+      },
+    ]);
+    addEdges([
+      { id: `edge-${id}-${derivedId}`, source: id, target: derivedId },
+    ]);
   }
 
   return (
@@ -142,10 +131,17 @@ export default function FilterNode({ id, data, selected }: NodeProps<FilterNodeT
       <div className="flex items-center gap-2 border-b border-neutral-700 bg-neutral-800 px-3 py-2">
         <span className="text-xs font-semibold text-neutral-300">⚙ Filter</span>
         {liveRowCount !== null && (
-          <span className="ml-auto rounded bg-violet-900/60 px-1.5 py-0.5 text-[10px] font-medium text-violet-300">
+          <span className="rounded bg-violet-900/60 px-1.5 py-0.5 text-[10px] font-medium text-violet-300">
             {liveRowCount.toLocaleString()} rows
           </span>
         )}
+        <button
+          onClick={handleDuplicate}
+          className="nodrag ml-auto text-neutral-500 hover:text-neutral-300"
+          title="Duplicate"
+        >
+          <Copy size={12} />
+        </button>
       </div>
 
       <div className="nodrag space-y-2 p-3">
@@ -228,9 +224,7 @@ export default function FilterNode({ id, data, selected }: NodeProps<FilterNodeT
           </button>
         )}
 
-        {error && (
-          <p className="text-xs text-red-400">{error}</p>
-        )}
+        {error && <p className="text-xs text-red-400">{error}</p>}
 
         <div className="border-t border-neutral-700 pt-2">
           <button

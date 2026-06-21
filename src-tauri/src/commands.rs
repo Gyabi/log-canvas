@@ -46,24 +46,25 @@ pub fn greet(name: &str) -> String {
 
 /// Open a DLT file, build a message-offset index, and return file metadata.
 ///
-/// The indexed state is stored in [`AppState`] and referenced by subsequent
-/// [`get_log_rows`] or [`create_view`] calls using the returned `id` (= `path`).
+/// `file_id` is a UUID supplied by the caller (via `crypto.randomUUID()` on the
+/// frontend) so that multiple sessions opening the same physical file each get a
+/// distinct key in [`AppState`].
 #[specta::specta]
 #[tauri::command]
 #[allow(clippy::needless_pass_by_value)]
 pub fn open_dlt_file(
     path: &str,
+    file_id: String,
     state: State<'_, AppState>,
 ) -> Result<DltFileInfo, String> {
     let offsets = dlt_parser::index_file(path)?;
     let row_count = u32::try_from(offsets.len()).map_err(|e| e.to_string())?;
-    let id = path.to_owned();
     state
         .dlt_files
         .lock()
         .map_err(|e| format!("lock poisoned: {e}"))?
-        .insert(id.clone(), DltFileState { path: path.to_owned(), offsets });
-    Ok(DltFileInfo { id, row_count, path: path.to_owned() })
+        .insert(file_id.clone(), DltFileState { path: path.to_owned(), offsets });
+    Ok(DltFileInfo { id: file_id, row_count, path: path.to_owned() })
 }
 
 /// Fetch a contiguous range of parsed DLT rows from a view (source or derived).
@@ -136,6 +137,22 @@ pub fn create_view(
         .insert(view_id, DltView { file_id, offsets: filtered });
 
     Ok(row_count)
+}
+
+/// Remove an opened DLT file from [`AppState`], freeing its offset index.
+///
+/// Should be called when the corresponding `SourceLogViewNode` is deleted.
+/// Silently succeeds if `file_id` does not exist.
+#[specta::specta]
+#[tauri::command]
+#[allow(clippy::needless_pass_by_value)]
+pub fn close_dlt_file(file_id: String, state: State<'_, AppState>) -> Result<(), String> {
+    state
+        .dlt_files
+        .lock()
+        .map_err(|e| format!("lock poisoned: {e}"))?
+        .remove(&file_id);
+    Ok(())
 }
 
 /// Remove a derived view from [`AppState`], freeing its offset index.

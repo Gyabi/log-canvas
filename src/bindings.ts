@@ -8,10 +8,18 @@ export const commands = {
 	/**
 	 *  Open a DLT file, build a message-offset index, and return file metadata.
 	 * 
-	 *  The indexed state is stored in [`AppState`] and referenced by subsequent
-	 *  [`get_log_rows`] or [`create_view`] calls using the returned `id` (= `path`).
+	 *  `file_id` is a UUID supplied by the caller (via `crypto.randomUUID()` on the
+	 *  frontend) so that multiple sessions opening the same physical file each get a
+	 *  distinct key in [`AppState`].
 	 */
-	openDltFile: (path: string) => typedError<DltFileInfo, string>(__TAURI_INVOKE("open_dlt_file", { path })),
+	openDltFile: (path: string, fileId: string) => typedError<DltFileInfo, string>(__TAURI_INVOKE("open_dlt_file", { path, fileId })),
+	/**
+	 *  Remove an opened DLT file from [`AppState`], freeing its offset index.
+	 * 
+	 *  Should be called when the corresponding `SourceLogViewNode` is deleted.
+	 *  Silently succeeds if `file_id` does not exist.
+	 */
+	closeDltFile: (fileId: string) => typedError<null, string>(__TAURI_INVOKE("close_dlt_file", { fileId })),
 	/**
 	 *  Fetch a contiguous range of parsed DLT rows from a view (source or derived).
 	 * 

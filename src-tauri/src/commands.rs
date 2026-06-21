@@ -152,3 +152,37 @@ pub fn delete_view(view_id: String, state: State<'_, AppState>) -> Result<(), St
         .remove(&view_id);
     Ok(())
 }
+
+/// Given a derived view and a zero-based row index within it, return the
+/// corresponding zero-based row index in `source_view_id`.
+///
+/// Used by the UI to jump to the matching row in a parent view on double-click.
+#[specta::specta]
+#[tauri::command]
+#[allow(clippy::needless_pass_by_value)]
+#[allow(clippy::significant_drop_tightening)]
+pub fn get_source_row_index(
+    derived_view_id: String,
+    derived_row_index: u32,
+    source_view_id: String,
+    state: State<'_, AppState>,
+) -> Result<u32, String> {
+    let (byte_offset, source_offsets) = {
+        let files = state.dlt_files.lock().map_err(|e| format!("lock poisoned: {e}"))?;
+        let views = state.dlt_views.lock().map_err(|e| format!("lock poisoned: {e}"))?;
+        let derived = views
+            .get(&derived_view_id)
+            .ok_or_else(|| format!("unknown derived view: {derived_view_id}"))?;
+        let slot = usize::try_from(derived_row_index).map_err(|e| e.to_string())?;
+        let &byte_offset = derived
+            .offsets
+            .get(slot)
+            .ok_or_else(|| format!("row {derived_row_index} out of range"))?;
+        let (_file_id, source_offsets) = resolve_view(&source_view_id, &files, &views)?;
+        (byte_offset, source_offsets)
+    };
+    let pos = source_offsets
+        .binary_search(&byte_offset)
+        .map_err(|_| format!("byte offset {byte_offset} not found in source view"))?;
+    u32::try_from(pos).map_err(|e| e.to_string())
+}

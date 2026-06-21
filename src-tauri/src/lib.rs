@@ -12,6 +12,7 @@ pub fn create_builder() -> Builder<tauri::Wry> {
         commands::get_log_rows,
         commands::create_view,
         commands::delete_view,
+        commands::get_source_row_index,
     ])
 }
 

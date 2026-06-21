@@ -36,6 +36,13 @@ export const commands = {
 	 *  Silently succeeds if `view_id` does not exist.
 	 */
 	deleteView: (viewId: string) => typedError<null, string>(__TAURI_INVOKE("delete_view", { viewId })),
+	/**
+	 *  Given a derived view and a zero-based row index within it, return the
+	 *  corresponding zero-based row index in `source_view_id`.
+	 * 
+	 *  Used by the UI to jump to the matching row in a parent view on double-click.
+	 */
+	getSourceRowIndex: (derivedViewId: string, derivedRowIndex: number, sourceViewId: string) => typedError<number, string>(__TAURI_INVOKE("get_source_row_index", { derivedViewId, derivedRowIndex, sourceViewId })),
 };
 
 /* Types */
@@ -65,7 +72,7 @@ export type DltFilter = {
 
 /**  A single parsed DLT log row returned to the frontend. */
 export type DltRow = {
-	/**  Zero-based row index within the file. */
+	/**  Zero-based row index within the view. */
 	index: number,
 	/**
 	 *  Absolute timestamp in microseconds (storage-header seconds × 10⁶ + microseconds).

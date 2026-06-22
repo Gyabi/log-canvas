@@ -12,11 +12,13 @@ import {
 } from "@xyflow/react";
 import { FileText, SlidersHorizontal, Palette } from "lucide-react";
 import { commands } from "../bindings";
-import SourceLogViewNode from "./log-view/SourceLogViewNode";
+import SourceLogViewNode, {
+  SourceLogViewData,
+} from "./log-view/SourceLogViewNode";
 import DerivedLogViewNode from "./log-view/DerivedLogViewNode";
 import FilterNode from "./condition/FilterNode";
 import MarkingNode from "./condition/MarkingNode";
-import type { SourceLogViewData, DerivedLogViewData } from "../types";
+import type { DerivedLogViewData } from "../types";
 import { ToolBar } from "./tool-bar/toolBar";
 
 const nodeTypes = {

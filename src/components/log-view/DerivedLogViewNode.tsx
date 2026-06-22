@@ -61,7 +61,8 @@ export default function DerivedLogViewNode({
         const logViewNode = logViewEdge
           ? nodes.find((n) => n.id === logViewEdge.source)
           : undefined;
-        const vid = (logViewNode?.data as { viewId?: string } | undefined)?.viewId;
+        const vid = (logViewNode?.data as { viewId?: string } | undefined)
+          ?.viewId;
         if (vid && logViewNode) {
           upstreamViewId = vid;
           upstreamNodeId = logViewNode.id;
@@ -80,12 +81,12 @@ export default function DerivedLogViewNode({
       const result = await commands.getSourceRowIndex(
         data.viewId,
         derivedRowIndex,
-        upstreamViewId,
+        upstreamViewId
       );
       if (result.status !== "ok") return;
       updateNodeData(upstreamNodeId, { jumpRequest: result.data });
     },
-    [id, data.viewId, getNodes, getEdges, updateNodeData],
+    [id, data.viewId, getNodes, getEdges, updateNodeData]
   );
 
   return (
@@ -100,7 +101,7 @@ export default function DerivedLogViewNode({
       <div className="shrink-0 flex items-center gap-2 border-b border-violet-800 bg-violet-950 px-3 py-2 cursor-grab active:cursor-grabbing">
         <span className="text-xs text-violet-400">▶ derive</span>
         <span className="flex-1 truncate text-xs font-semibold text-neutral-300">
-          {data.label ?? (data.viewId?.slice(0, 8) ?? "…")}
+          {data.label ?? data.viewId?.slice(0, 8) ?? "…"}
         </span>
         <span className="shrink-0 text-xs text-neutral-500">
           {data.rowCount.toLocaleString()} rows

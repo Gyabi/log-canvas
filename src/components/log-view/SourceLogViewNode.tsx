@@ -11,7 +11,16 @@ import {
 import { commands } from "../../bindings";
 import { useLogView } from "./useLogView";
 import LogViewDisplay from "./LogViewDisplay";
-import type { SourceLogViewData } from "../../types";
+
+export type SourceLogViewData = {
+  /** UUID assigned at open_dlt_file time. Not the file path. */
+  viewId?: string;
+  /** Full file path — used only for display. */
+  filePath?: string;
+  rowCount?: number;
+  /** Set to a 0-based row index to request a scroll jump; cleared after handling. */
+  jumpRequest?: number;
+};
 
 export type SourceLogViewNodeType = Node<SourceLogViewData, "sourceLogView">;
 
@@ -23,6 +32,7 @@ export default function SourceLogViewNode({
   const { updateNodeData } = useReactFlow();
   const lv = useLogView(data.viewId, data.rowCount ?? 0);
 
+  // set jump request
   useEffect(() => {
     if (data.jumpRequest == null) return;
     lv.scrollToIndex(data.jumpRequest);
@@ -31,7 +41,9 @@ export default function SourceLogViewNode({
   }, [data.jumpRequest]);
 
   async function handleOpenFile() {
-    const path = await open({ filters: [{ name: "DLT", extensions: ["dlt"] }] });
+    const path = await open({
+      filters: [{ name: "DLT", extensions: ["dlt"] }],
+    });
     if (!path) return;
     const fileId = crypto.randomUUID();
     const result = await commands.openDltFile(path, fileId);

@@ -11,6 +11,7 @@ import { Copy } from "lucide-react";
 import type { FilterNodeData, DerivedLogViewData } from "../../types";
 
 export type { FilterNodeData };
+
 export type FilterNodeType = Node<FilterNodeData, "filter">;
 
 const FIELD_OPTIONS = [

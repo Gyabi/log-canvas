@@ -21,16 +21,6 @@ export type MarkingNodeData = {
   rules: MarkingRule[];
 };
 
-export type SourceLogViewData = {
-  /** UUID assigned at open_dlt_file time. Not the file path. */
-  viewId?: string;
-  /** Full file path — used only for display. */
-  filePath?: string;
-  rowCount?: number;
-  /** Set to a 0-based row index to request a scroll jump; cleared after handling. */
-  jumpRequest?: number;
-};
-
 export type DerivedLogViewData = {
   /**
    * Current backend view ID.

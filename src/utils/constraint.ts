@@ -15,6 +15,14 @@ export const OP_OPTIONS = [
 
 export type MarkColor = "red" | "yellow" | "green" | "blue" | "purple";
 
+export const DOT: Record<MarkColor, string> = {
+  red: "bg-red-500",
+  yellow: "bg-amber-400",
+  green: "bg-green-500",
+  blue: "bg-blue-500",
+  purple: "bg-purple-500",
+};
+
 export const COLOR_OPTIONS: { value: MarkColor; dot: string }[] = [
   { value: "red", dot: "bg-red-500" },
   { value: "yellow", dot: "bg-amber-400" },

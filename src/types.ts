@@ -1,8 +1,6 @@
-import type { DltFilter } from "./bindings";
-
 // ── Display types ────────────────────────────────────────────────────────────
 
-export type MarkColor = "red" | "yellow" | "green" | "blue" | "purple";
+import { MarkColor } from "./utils/constraint";
 
 export type MarkingRule = {
   field: string;
@@ -12,10 +10,6 @@ export type MarkingRule = {
 };
 
 // ── Node data shapes ─────────────────────────────────────────────────────────
-
-export type FilterNodeData = {
-  filters: DltFilter[];
-};
 
 export type MarkingNodeData = {
   rules: MarkingRule[];

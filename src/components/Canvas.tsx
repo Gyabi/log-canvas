@@ -10,7 +10,7 @@ import {
   type Node,
   type Connection,
 } from "@xyflow/react";
-import { FileText, SlidersHorizontal, Palette } from "lucide-react";
+import { FileText, SlidersHorizontal, Palette, Sparkle } from "lucide-react";
 import { commands } from "../bindings";
 import SourceLogViewNode, {
   SourceLogViewData,
@@ -20,6 +20,7 @@ import FilterNode from "./condition/FilterNode";
 import MarkingNode from "./condition/MarkingNode";
 import type { DerivedLogViewData } from "../types";
 import { ToolBar } from "./tool-bar/toolBar";
+import { NODE_TEMPLATES } from "../utils/constraint";
 
 const nodeTypes = {
   sourceLogView: SourceLogViewNode,
@@ -48,48 +49,55 @@ export default function Canvas() {
     }
   }
 
-  function addSourceLogViewNode() {
-    const id = `source-${crypto.randomUUID()}`;
+  function addNode(type: keyof typeof NODE_TEMPLATES) {
+    const template = NODE_TEMPLATES[type];
     const offset = (nodes.length % 5) * 40;
+
     setNodes((prev) => [
       ...prev,
       {
-        id,
-        type: "sourceLogView",
-        position: { x: 80 + offset, y: 80 + offset },
-        data: {},
-        style: { width: 1280, height: 720 },
+        id: `${type}-${crypto.randomUUID()}`,
+        type,
+        position: {
+          x: template.position.x + offset,
+          y: template.position.y + offset,
+        },
+        data: structuredClone(template.data),
+        style: template.style,
       },
     ]);
   }
 
-  function addFilterNode() {
-    const id = `filter-${crypto.randomUUID()}`;
-    const offset = (nodes.length % 5) * 40;
-    setNodes((prev) => [
-      ...prev,
-      {
-        id,
-        type: "filter",
-        position: { x: 200 + offset, y: 200 + offset },
-        data: { filters: [] },
-      },
-    ]);
-  }
-
-  function addMarkingNode() {
-    const id = `marking-${crypto.randomUUID()}`;
-    const offset = (nodes.length % 5) * 40;
-    setNodes((prev) => [
-      ...prev,
-      {
-        id,
-        type: "marking",
-        position: { x: 200 + offset, y: 300 + offset },
-        data: { rules: [] },
-      },
-    ]);
-  }
+  const toolbarItems = [
+    {
+      type: "sourceLogView",
+      icon: <FileText size={16} className="text-blue-300" />,
+      label: "Log File",
+      description: "DLT source view",
+      accent: "bg-blue-900/60",
+    },
+    {
+      type: "filter",
+      icon: <SlidersHorizontal size={16} className="text-amber-300" />,
+      label: "Filter",
+      description: "Row filter conditions",
+      accent: "bg-amber-900/60",
+    },
+    {
+      type: "marking",
+      icon: <Palette size={16} className="text-purple-300" />,
+      label: "Marking",
+      description: "Color highlight rules",
+      accent: "bg-purple-900/60",
+    },
+    {
+      type: "derivedLogView",
+      icon: <Sparkle size={16} className="text-green-300" />,
+      label: "Output",
+      description: "Derived log view",
+      accent: "bg-green-900/60",
+    },
+  ] as const;
 
   return (
     <div className="relative h-full w-full">
@@ -124,29 +132,10 @@ export default function Canvas() {
       {/* Floating toolbar */}
       <ToolBar
         title="ADD NODE"
-        items={[
-          {
-            icon: <FileText size={16} className="text-blue-300" />,
-            label: "Log File",
-            description: "DLT source view",
-            onClick: addSourceLogViewNode,
-            accent: "bg-blue-900/60",
-          },
-          {
-            icon: <SlidersHorizontal size={16} className="text-amber-300" />,
-            label: "Filter",
-            description: "Row filter conditions",
-            onClick: addFilterNode,
-            accent: "bg-amber-900/60",
-          },
-          {
-            icon: <Palette size={16} className="text-purple-300" />,
-            label: "Marking",
-            description: "Color highlight rules",
-            onClick: addMarkingNode,
-            accent: "bg-purple-900/60",
-          },
-        ]}
+        items={toolbarItems.map((item) => ({
+          ...item,
+          onClick: () => addNode(item.type),
+        }))}
       />
     </div>
   );

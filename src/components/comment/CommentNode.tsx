@@ -5,7 +5,14 @@ import {
   useReactFlow,
   type NodeProps,
 } from "@xyflow/react";
-import { COLOR_OPTIONS, COMMENT_BG } from "../../utils/constraint";
+import {
+  COLOR_OPTIONS,
+  COMMENT_BG,
+  commentNodeBottomHandleID,
+  commentNodeLeftHandleID,
+  commentNodeRightHandleID,
+  commentNodeTopHandleID,
+} from "../../utils/constraint";
 import type { CommentNodeType } from "../../types/comment";
 
 export default function CommentNode({
@@ -18,7 +25,7 @@ export default function CommentNode({
 
   return (
     <div
-      className={`relative flex flex-col rounded border ${bgClass} overflow-hidden`}
+      className={`flex flex-col rounded border ${bgClass} overflow-hidden`}
       style={{ width: "100%", height: "100%", minWidth: 160, minHeight: 80 }}
     >
       <div className="flex items-center gap-2 border-b border-neutral-700 bg-neutral-800 rounded-t-lg px-3 py-2">
@@ -29,11 +36,27 @@ export default function CommentNode({
 
       <NodeResizer isVisible={selected} minWidth={160} minHeight={80} />
 
+      <Handle
+        type="source"
+        position={Position.Top}
+        id={commentNodeTopHandleID}
+      />
+      <Handle
+        type="source"
+        position={Position.Bottom}
+        id={commentNodeBottomHandleID}
+      />
+      <Handle
+        type="source"
+        position={Position.Left}
+        id={commentNodeLeftHandleID}
+      />
+      <Handle
+        type="source"
+        position={Position.Right}
+        id={commentNodeRightHandleID}
+      />
       {/* Source handles — drag from any side to a LogView row handle */}
-      <Handle type="source" position={Position.Top} id="comment-top" />
-      <Handle type="source" position={Position.Bottom} id="comment-bottom" />
-      <Handle type="source" position={Position.Left} id="comment-left" />
-      <Handle type="source" position={Position.Right} id="comment-right" />
 
       <textarea
         className="nodrag nowheel flex-1 resize-none bg-transparent px-2 pt-2 text-xs text-neutral-200 outline-none placeholder:text-neutral-600"

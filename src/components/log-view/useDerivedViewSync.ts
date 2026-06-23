@@ -2,13 +2,13 @@ import { useEffect } from "react";
 import { useStore, useReactFlow } from "@xyflow/react";
 import type { Node, Edge } from "@xyflow/react";
 import { commands } from "../../bindings";
-import type { DerivedLogViewData } from "./DerivedLogViewNode";
+import type { DerivedLogViewData } from "../../types/logView";
 import {
   collectUpstreamChain,
   buildSyncSignature,
   chainFilters,
   chainMarkingRules,
-} from "./graphTraversal";
+} from "../../utils/graphTraversal";
 
 /**
  * Watches the upstream chain for a DerivedLogViewNode and keeps the backend

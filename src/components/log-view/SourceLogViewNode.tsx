@@ -6,24 +6,14 @@ import {
   Position,
   useReactFlow,
   type NodeProps,
-  type Node,
 } from "@xyflow/react";
 import { commands } from "../../bindings";
 import { useLogView } from "./useLogView";
 import LogViewDisplay from "./LogViewDisplay";
 import { sourceLogViewOutputHandleId } from "../../utils/constraint";
+import type { SourceLogViewData, SourceLogViewNodeType } from "../../types/logView";
 
-export type SourceLogViewData = {
-  /** UUID assigned at open_dlt_file time. Not the file path. */
-  viewId?: string;
-  /** Full file path — used only for display. */
-  filePath?: string;
-  rowCount?: number;
-  /** Set to a 0-based row index to request a scroll jump; cleared after handling. */
-  jumpRequest?: number;
-};
-
-export type SourceLogViewNodeType = Node<SourceLogViewData, "sourceLogView">;
+export type { SourceLogViewData, SourceLogViewNodeType };
 
 export default function SourceLogViewNode({
   id,

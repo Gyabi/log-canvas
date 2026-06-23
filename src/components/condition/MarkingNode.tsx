@@ -1,34 +1,13 @@
 import { useState } from "react";
-import { useReactFlow, type NodeProps, type Node } from "@xyflow/react";
-import { DOT } from "../../utils/constraint";
-
-export type MarkingRule = {
-  field: string;
-  op: string;
-  value: string;
-  color: MarkColor;
-};
-export type MarkingNodeData = {
-  rules: MarkingRule[];
-};
-export type MarkingNodeType = Node<MarkingNodeData, "marking">;
-
-import {
-  FIELD_OPTIONS,
-  COLOR_OPTIONS,
-  MarkColor,
-  OP_OPTIONS,
-} from "../../utils/constraint";
+import { useReactFlow, type NodeProps } from "@xyflow/react";
+import { DOT, COLOR_OPTIONS } from "../../utils/constraint";
+import type { MarkColor } from "../../utils/constraint";
+import type { MarkingNodeData, MarkingNodeType } from "../../types/condition";
+import { conditionChipLabel } from "../../utils/conditionChipLabel";
 import ConditionBase from "./conditionBase";
 import { ConditionEditor } from "./conditionEditor";
 
-function chipLabel(r: MarkingRule): string {
-  const field =
-    FIELD_OPTIONS.find((o) => o.value === r.field)?.label ?? r.field;
-  const op =
-    OP_OPTIONS.find((o) => o.value === r.op)?.label?.split(" ")[0] ?? r.op;
-  return `${field} ${op} ${r.value}`;
-}
+export type { MarkingNodeData, MarkingNodeType };
 
 export default function MarkingNode({
   id,
@@ -54,7 +33,7 @@ export default function MarkingNode({
               <span
                 className={`inline-block h-2 w-2 rounded-full ${DOT[r.color]}`}
               />
-              {chipLabel(r)}
+              {conditionChipLabel(r)}
               <button
                 onClick={() => removeRule(i)}
                 className="text-neutral-400 hover:text-red-400"
@@ -72,12 +51,7 @@ export default function MarkingNode({
           updateNodeData(id, {
             rules: [
               ...data.rules,
-              {
-                field,
-                op,
-                value,
-                color: newColor,
-              },
+              { field, op, value, color: newColor },
             ],
           });
         }}

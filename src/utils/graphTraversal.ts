@@ -1,7 +1,6 @@
 import type { Node, Edge } from "@xyflow/react";
-import type { DltFilter } from "../../bindings";
-import type { FilterNodeData } from "../condition/FilterNode";
-import type { MarkingNodeData, MarkingRule } from "../condition/MarkingNode";
+import type { DltFilter } from "../bindings";
+import type { FilterNodeData, MarkingNodeData, MarkingRule } from "../types/condition";
 
 export type FilterStep = {
   kind: "filter";

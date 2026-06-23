@@ -1,22 +1,10 @@
 import { useState } from "react";
 import type { useLogView } from "./useLogView";
-import type { TsMode } from "./useLogView";
 import type { DltRow } from "../../bindings";
-import { MarkColor } from "../../utils/constraint";
-
-// Re-export for consumers that import display types from this file.
-export type { MarkColor };
-
-const MARK_BG: Record<MarkColor, string> = {
-  red: "bg-red-900/50",
-  yellow: "bg-amber-900/50",
-  green: "bg-green-900/50",
-  blue: "bg-blue-900/50",
-  purple: "bg-purple-900/50",
-};
-
-const TS_MODES: TsMode[] = ["abs", "rel", "us"];
-const TS_LABELS: Record<TsMode, string> = { abs: "ABS", rel: "REL", us: "μs" };
+import { MARK_BG } from "../../utils/constraint";
+import type { MarkColor } from "../../utils/constraint";
+import { TS_MODES, TS_LABELS, formatTs, levelClass } from "../../utils/dltFormat";
+import type { TsMode } from "../../types/logView";
 
 type Props = ReturnType<typeof useLogView> & {
   emptyMessage: string;
@@ -99,7 +87,7 @@ export default function LogViewDisplay({
           onClick={cycleTsMode}
           className="nodrag w-28 shrink-0 text-left hover:text-neutral-300"
         >
-          {`Timestamp [${TS_LABELS[tsMode]}]`}
+          {`Timestamp [${TS_LABELS[tsMode as TsMode]}]`}
         </button>
         <span className="w-12 shrink-0">ECU</span>
         <span className="w-12 shrink-0">App</span>
@@ -225,46 +213,4 @@ export default function LogViewDisplay({
       </div>
     </>
   );
-}
-
-function formatTs(
-  us: number | null,
-  mode: TsMode,
-  baseUs: number | null
-): string {
-  if (us == null) return "—";
-  if (mode === "us") return us.toFixed(0);
-  if (mode === "rel") {
-    const rel = (us - (baseUs ?? us)) / 1_000_000;
-    return `+${rel.toFixed(3)}s`;
-  }
-  const totalSec = Math.floor(us / 1_000_000);
-  const ms = Math.floor((us % 1_000_000) / 1000);
-  const h = Math.floor(totalSec / 3_600)
-    .toString()
-    .padStart(2, "0");
-  const m = Math.floor((totalSec % 3_600) / 60)
-    .toString()
-    .padStart(2, "0");
-  const s = (totalSec % 60).toString().padStart(2, "0");
-  return `${h}:${m}:${s}.${ms.toString().padStart(3, "0")}`;
-}
-
-function levelClass(level: string): string {
-  switch (level) {
-    case "FATAL":
-      return "text-red-500";
-    case "ERROR":
-      return "text-red-400";
-    case "WARN":
-      return "text-amber-400";
-    case "INFO":
-      return "text-green-400";
-    case "DEBUG":
-      return "text-sky-400";
-    case "VERBOSE":
-      return "text-neutral-400";
-    default:
-      return "text-neutral-400";
-  }
 }

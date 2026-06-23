@@ -5,36 +5,18 @@ import {
   Position,
   useReactFlow,
   type NodeProps,
-  type Node,
 } from "@xyflow/react";
 import { commands } from "../../bindings";
 import { useLogView } from "./useLogView";
 import LogViewDisplay from "./LogViewDisplay";
-import { computeMarks } from "./markingUtils";
 import { useDerivedViewSync } from "./useDerivedViewSync";
-import { collectUpstreamChain } from "./graphTraversal";
+import { collectUpstreamChain } from "../../utils/graphTraversal";
+import { computeMarks, EMPTY_MARKS } from "../../utils";
 import { derivedLogViewInputHandleId } from "../../utils/constraint";
-import type { MarkingRule } from "../condition/MarkingNode";
+import type { DerivedLogViewData, DerivedLogViewNodeType } from "../../types/logView";
 import type { MarkColor } from "../../utils/constraint";
 
-export type DerivedLogViewData = {
-  /**
-   * Current backend view ID.
-   * - undefined until useDerivedViewSync runs for the first time
-   * - equals upstream sourceViewId when no FilterNodes are in the chain
-   * - a new UUID whenever filters are (re-)applied
-   */
-  viewId?: string;
-  rowCount: number;
-  label?: string;
-  /** Marking rules collected from MarkingNodes in the upstream chain. */
-  markingRules?: MarkingRule[];
-  /** Set to a 0-based row index to request a scroll jump; cleared after handling. */
-  jumpRequest?: number;
-};
-export type DerivedLogViewNodeType = Node<DerivedLogViewData, "derivedLogView">;
-
-const EMPTY_MARKS: ReadonlyMap<number, MarkColor> = new Map();
+export type { DerivedLogViewData, DerivedLogViewNodeType };
 
 export default function DerivedLogViewNode({
   id,

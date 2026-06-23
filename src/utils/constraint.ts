@@ -23,6 +23,22 @@ export const DOT: Record<MarkColor, string> = {
   purple: "bg-purple-500",
 };
 
+export const MARK_BG: Record<MarkColor, string> = {
+  red: "bg-red-900/50",
+  yellow: "bg-amber-900/50",
+  green: "bg-green-900/50",
+  blue: "bg-blue-900/50",
+  purple: "bg-purple-900/50",
+};
+
+export const EMPTY_MARKS: ReadonlyMap<number, MarkColor> = new Map();
+
+export const SINGLE_INPUT_TYPES: ReadonlySet<string> = new Set([
+  "derivedLogView",
+  "filter",
+  "marking",
+]);
+
 export const COLOR_OPTIONS: { value: MarkColor; dot: string }[] = [
   { value: "red", dot: "bg-red-500" },
   { value: "yellow", dot: "bg-amber-400" },

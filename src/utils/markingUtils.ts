@@ -1,6 +1,6 @@
-import type { DltRow } from "../../bindings";
-import { MarkingRule } from "../condition/MarkingNode";
-import { MarkColor } from "./LogViewDisplay";
+import type { DltRow } from "../bindings";
+import type { MarkingRule } from "../types/condition";
+import type { MarkColor } from "./constraint";
 
 function fieldValue(row: DltRow, field: string): string {
   switch (field) {

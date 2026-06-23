@@ -1,6 +1,10 @@
 import { ReactNode } from "react";
 import { Handle, Position, useReactFlow } from "@xyflow/react";
 import { Copy } from "lucide-react";
+import {
+  conditionBaseInputHandleId,
+  conditionBaseOutputHandleId,
+} from "../../utils/constraint";
 
 export type ConditionBaseProps = {
   id: string;
@@ -39,8 +43,16 @@ export default function ConditionBase({
         selected ? "border-blue-500" : "border-neutral-600"
       }`}
     >
-      <Handle type="target" position={Position.Left} />
-      <Handle type="source" position={Position.Right} />
+      <Handle
+        type="target"
+        position={Position.Left}
+        id={conditionBaseInputHandleId}
+      />
+      <Handle
+        type="source"
+        position={Position.Right}
+        id={conditionBaseOutputHandleId}
+      />
 
       <div className="flex items-center gap-2 border-b border-neutral-700 bg-neutral-800 px-3 py-2">
         <span className="text-xs font-semibold text-neutral-300">{title}</span>

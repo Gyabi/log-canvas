@@ -12,7 +12,8 @@ import { useLogView } from "./useLogView";
 import LogViewDisplay from "./LogViewDisplay";
 import { computeMarks } from "./markingUtils";
 import { useDerivedViewSync } from "./useDerivedViewSync";
-import type { MarkColor, DerivedLogViewData } from "../../types";
+import type { DerivedLogViewData } from "../../types";
+import { derivedLogViewInputHandleId, MarkColor } from "../../utils/constraint";
 
 export type { DerivedLogViewData };
 export type DerivedLogViewNodeType = Node<DerivedLogViewData, "derivedLogView">;
@@ -96,7 +97,11 @@ export default function DerivedLogViewNode({
     >
       <NodeResizer isVisible={selected} minWidth={400} minHeight={200} />
       {/* target only: DerivedLogViewNode is always the terminal node in the graph */}
-      <Handle type="target" position={Position.Left} />
+      <Handle
+        type="target"
+        position={Position.Left}
+        id={derivedLogViewInputHandleId}
+      />
 
       <div className="shrink-0 flex items-center gap-2 border-b border-violet-800 bg-violet-950 px-3 py-2 cursor-grab active:cursor-grabbing">
         <span className="text-xs text-violet-400">▶ derive</span>

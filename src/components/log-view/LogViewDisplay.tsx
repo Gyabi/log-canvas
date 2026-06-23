@@ -2,7 +2,7 @@ import { useState } from "react";
 import type { useLogView } from "./useLogView";
 import type { TsMode } from "./useLogView";
 import type { DltRow } from "../../bindings";
-import type { MarkColor } from "../../types";
+import { MarkColor } from "../../utils/constraint";
 
 // Re-export for consumers that import display types from this file.
 export type { MarkColor };

@@ -56,3 +56,8 @@ export const NODE_TEMPLATES = {
     style: { width: 1280, height: 720 },
   },
 } as const;
+
+export const conditionBaseInputHandleId = "condition-input";
+export const conditionBaseOutputHandleId = "condition-output";
+export const derivedLogViewInputHandleId = "derived-log-view-input";
+export const sourceLogViewOutputHandleId = "source-log-view-output";

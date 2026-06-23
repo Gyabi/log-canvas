@@ -1,19 +1,6 @@
 // ── Display types ────────────────────────────────────────────────────────────
 
-import { MarkColor } from "./utils/constraint";
-
-export type MarkingRule = {
-  field: string;
-  op: string;
-  value: string;
-  color: MarkColor;
-};
-
 // ── Node data shapes ─────────────────────────────────────────────────────────
-
-export type MarkingNodeData = {
-  rules: MarkingRule[];
-};
 
 export type DerivedLogViewData = {
   /**

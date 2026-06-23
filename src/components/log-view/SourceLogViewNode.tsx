@@ -11,6 +11,7 @@ import {
 import { commands } from "../../bindings";
 import { useLogView } from "./useLogView";
 import LogViewDisplay from "./LogViewDisplay";
+import { sourceLogViewOutputHandleId } from "../../utils/constraint";
 
 export type SourceLogViewData = {
   /** UUID assigned at open_dlt_file time. Not the file path. */
@@ -66,7 +67,11 @@ export default function SourceLogViewNode({
       style={{ width: "100%", height: "100%" }}
     >
       <NodeResizer isVisible={selected} minWidth={400} minHeight={200} />
-      <Handle type="source" position={Position.Right} />
+      <Handle
+        type="source"
+        position={Position.Right}
+        id={sourceLogViewOutputHandleId}
+      />
 
       <div className="shrink-0 flex items-center gap-2 border-b border-neutral-700 bg-neutral-800 px-3 py-2 cursor-grab active:cursor-grabbing">
         <span className="flex-1 truncate text-xs font-semibold text-neutral-300">

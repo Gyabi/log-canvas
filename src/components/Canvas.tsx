@@ -8,6 +8,7 @@ import {
   useNodesState,
   useEdgesState,
   type Node,
+  type Edge,
   type Connection,
 } from "@xyflow/react";
 import { FileText, SlidersHorizontal, Palette, Sparkle } from "lucide-react";
@@ -15,10 +16,11 @@ import { commands } from "../bindings";
 import SourceLogViewNode, {
   SourceLogViewData,
 } from "./log-view/SourceLogViewNode";
-import DerivedLogViewNode from "./log-view/DerivedLogViewNode";
+import DerivedLogViewNode, {
+  type DerivedLogViewData,
+} from "./log-view/DerivedLogViewNode";
 import FilterNode from "./condition/FilterNode";
 import MarkingNode from "./condition/MarkingNode";
-import type { DerivedLogViewData } from "../types";
 import { ToolBar } from "./tool-bar/toolBar";
 import { NODE_TEMPLATES } from "../utils/constraint";
 
@@ -31,7 +33,22 @@ const nodeTypes = {
 
 export default function Canvas() {
   const [nodes, setNodes, onNodesChange] = useNodesState<Node>([]);
-  const [edges, setEdges, onEdgesChange] = useEdgesState([]);
+  const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
+
+  // Nodes that accept only one incoming edge (single-input constraint).
+  const SINGLE_INPUT_TYPES = new Set(["derivedLogView", "filter", "marking"]);
+
+  function isValidConnection(connection: Edge | Connection): boolean {
+    const targetNode = nodes.find((n) => n.id === connection.target);
+    if (!targetNode) return false;
+
+    if (SINGLE_INPUT_TYPES.has(targetNode.type ?? "")) {
+      const alreadyConnected = edges.some((e) => e.target === connection.target);
+      if (alreadyConnected) return false;
+    }
+
+    return true;
+  }
 
   function onConnect(params: Connection) {
     setEdges((eds) => addEdge(params, eds));
@@ -108,6 +125,7 @@ export default function Canvas() {
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}
         onNodesDelete={onNodesDelete}
+        isValidConnection={isValidConnection}
         nodeTypes={nodeTypes}
         panOnDrag
         zoomOnScroll

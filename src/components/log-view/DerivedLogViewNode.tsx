@@ -12,10 +12,26 @@ import { useLogView } from "./useLogView";
 import LogViewDisplay from "./LogViewDisplay";
 import { computeMarks } from "./markingUtils";
 import { useDerivedViewSync } from "./useDerivedViewSync";
-import type { DerivedLogViewData } from "../../types";
-import { derivedLogViewInputHandleId, MarkColor } from "../../utils/constraint";
+import { collectUpstreamChain } from "./graphTraversal";
+import { derivedLogViewInputHandleId } from "../../utils/constraint";
+import type { MarkingRule } from "../condition/MarkingNode";
+import type { MarkColor } from "../../utils/constraint";
 
-export type { DerivedLogViewData };
+export type DerivedLogViewData = {
+  /**
+   * Current backend view ID.
+   * - undefined until useDerivedViewSync runs for the first time
+   * - equals upstream sourceViewId when no FilterNodes are in the chain
+   * - a new UUID whenever filters are (re-)applied
+   */
+  viewId?: string;
+  rowCount: number;
+  label?: string;
+  /** Marking rules collected from MarkingNodes in the upstream chain. */
+  markingRules?: MarkingRule[];
+  /** Set to a 0-based row index to request a scroll jump; cleared after handling. */
+  jumpRequest?: number;
+};
 export type DerivedLogViewNodeType = Node<DerivedLogViewData, "derivedLogView">;
 
 const EMPTY_MARKS: ReadonlyMap<number, MarkColor> = new Map();
@@ -42,50 +58,28 @@ export default function DerivedLogViewNode({
     return computeMarks(lv.rowCache, data.markingRules);
   }, [lv.rowCache, data.markingRules]);
 
-  // Double-click: find the upstream SourceLogViewNode through condition nodes
-  // and send a jumpRequest so it scrolls to the same source row.
+  // Double-click: traverse the upstream chain to find the SourceLogView,
+  // then send a jumpRequest so it scrolls to the corresponding source row.
   const handleRowDoubleClick = useCallback(
     async (derivedRowIndex: number) => {
       if (!data.viewId) return;
 
-      const nodes = getNodes();
-      const edges = getEdges();
-      const incomingEdges = edges.filter((e) => e.target === id);
+      const chain = collectUpstreamChain(id, getNodes(), getEdges());
+      if (!chain) return;
 
-      // Traverse condition node → upstream log view
-      let upstreamViewId: string | undefined;
-      let upstreamNodeId: string | undefined;
-      for (const condEdge of incomingEdges) {
-        const condNode = nodes.find((n) => n.id === condEdge.source);
-        if (!condNode) continue;
-        const logViewEdge = edges.find((e) => e.target === condNode.id);
-        const logViewNode = logViewEdge
-          ? nodes.find((n) => n.id === logViewEdge.source)
-          : undefined;
-        const vid = (logViewNode?.data as { viewId?: string } | undefined)
-          ?.viewId;
-        if (vid && logViewNode) {
-          upstreamViewId = vid;
-          upstreamNodeId = logViewNode.id;
-          break;
-        }
-      }
-      if (!upstreamViewId || !upstreamNodeId) return;
-
-      if (data.viewId === upstreamViewId) {
-        // No filtering active — row index is the same in the upstream view.
-        updateNodeData(upstreamNodeId, { jumpRequest: derivedRowIndex });
+      if (data.viewId === chain.sourceViewId) {
+        // No filters active — derived row index equals source row index.
+        updateNodeData(chain.sourceNodeId, { jumpRequest: derivedRowIndex });
         return;
       }
 
-      // Filtered view: ask Rust to map the derived row index to the source row index.
       const result = await commands.getSourceRowIndex(
         data.viewId,
         derivedRowIndex,
-        upstreamViewId
+        chain.sourceViewId
       );
       if (result.status !== "ok") return;
-      updateNodeData(upstreamNodeId, { jumpRequest: result.data });
+      updateNodeData(chain.sourceNodeId, { jumpRequest: result.data });
     },
     [id, data.viewId, getNodes, getEdges, updateNodeData]
   );
@@ -96,7 +90,7 @@ export default function DerivedLogViewNode({
       style={{ width: "100%", height: "100%" }}
     >
       <NodeResizer isVisible={selected} minWidth={400} minHeight={200} />
-      {/* target only: DerivedLogViewNode is always the terminal node in the graph */}
+      {/* DerivedLogView is always the terminal node — target handle only */}
       <Handle
         type="target"
         position={Position.Left}

@@ -13,3 +13,5 @@ export type {
   DerivedLogViewData,
   DerivedLogViewNodeType,
 } from "./logView";
+
+export type { CommentColor, CommentNodeData, CommentNodeType } from "./comment";

@@ -71,9 +71,31 @@ export const NODE_TEMPLATES = {
     },
     style: { width: 1280, height: 720 },
   },
+  comment: {
+    position: { x: 300, y: 200 },
+    data: { text: "", color: "yellow" },
+    style: { width: 200, height: 120 },
+  },
 } as const;
 
 export const conditionBaseInputHandleId = "condition-input";
 export const conditionBaseOutputHandleId = "condition-output";
 export const derivedLogViewInputHandleId = "derived-log-view-input";
 export const sourceLogViewOutputHandleId = "source-log-view-output";
+
+// Comment node colors
+export const COMMENT_BG: Record<MarkColor, string> = {
+  red: "bg-red-950 border-red-700",
+  yellow: "bg-amber-950 border-amber-600",
+  green: "bg-green-950 border-green-700",
+  blue: "bg-blue-950 border-blue-700",
+  purple: "bg-purple-950 border-purple-700",
+};
+
+export const COMMENT_OUTLINE: Record<MarkColor, string> = {
+  red: "outline-red-500",
+  yellow: "outline-amber-400",
+  green: "outline-green-500",
+  blue: "outline-blue-500",
+  purple: "outline-purple-500",
+};

@@ -11,12 +11,13 @@ import {
   type Edge,
   type Connection,
 } from "@xyflow/react";
-import { FileText, SlidersHorizontal, Palette, Sparkle } from "lucide-react";
+import { FileText, SlidersHorizontal, Palette, Sparkle, MessageSquare } from "lucide-react";
 import { commands } from "../bindings";
 import SourceLogViewNode from "./log-view/SourceLogViewNode";
 import DerivedLogViewNode from "./log-view/DerivedLogViewNode";
 import FilterNode from "./condition/FilterNode";
 import MarkingNode from "./condition/MarkingNode";
+import CommentNode from "./comment/CommentNode";
 import { ToolBar } from "./tool-bar/toolBar";
 import { NODE_TEMPLATES, SINGLE_INPUT_TYPES } from "../utils/constraint";
 import type { SourceLogViewData } from "../types/logView";
@@ -27,6 +28,7 @@ const nodeTypes = {
   derivedLogView: DerivedLogViewNode,
   filter: FilterNode,
   marking: MarkingNode,
+  comment: CommentNode,
 };
 
 export default function Canvas() {
@@ -108,6 +110,13 @@ export default function Canvas() {
       label: "Output",
       description: "Derived log view",
       accent: "bg-green-900/60",
+    },
+    {
+      type: "comment",
+      icon: <MessageSquare size={16} className="text-yellow-300" />,
+      label: "Comment",
+      description: "Add a note",
+      accent: "bg-yellow-900/60",
     },
   ] as const;
 

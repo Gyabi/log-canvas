@@ -25,7 +25,7 @@ export default function CommentNode({
 
   return (
     <div
-      className={`flex flex-col rounded border ${bgClass} overflow-hidden`}
+      className={`flex flex-col rounded-lg border ${bgClass} overflow-hidden`}
       style={{ width: "100%", height: "100%", minWidth: 160, minHeight: 80 }}
     >
       <div className="flex items-center gap-2 border-b border-neutral-700 bg-neutral-800 rounded-t-lg px-3 py-2">

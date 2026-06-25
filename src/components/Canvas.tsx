@@ -20,7 +20,13 @@ import FilterNode from "./condition/FilterNode";
 import MarkingNode from "./condition/MarkingNode";
 import CommentNode from "./comment/CommentNode";
 import { ToolBar } from "./tool-bar/toolBar";
-import { NODE_TEMPLATES, SINGLE_INPUT_TYPES } from "../utils/constraint";
+import {
+  NODE_TEMPLATES,
+  SINGLE_INPUT_TYPES,
+  isRowAnchorHandle,
+  sourceLogViewOutputHandleId,
+  conditionBaseOutputHandleId,
+} from "../utils/constraint";
 import type { SourceLogViewData } from "../types/logView";
 import type { DerivedLogViewData } from "../types/logView";
 
@@ -37,14 +43,36 @@ export default function Canvas() {
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
 
   function isValidConnection(connection: Edge | Connection): boolean {
+    const sourceNode = nodes.find((n) => n.id === connection.source);
     const targetNode = nodes.find((n) => n.id === connection.target);
-    if (!targetNode) return false;
+    if (!sourceNode || !targetNode) return false;
 
-    if (SINGLE_INPUT_TYPES.has(targetNode.type ?? "")) {
+    const sh = connection.sourceHandle ?? "";
+    const th = connection.targetHandle ?? "";
+    const sourceType = sourceNode.type ?? "";
+    const targetType = targetNode.type ?? "";
+
+    // Row-anchor handle ↔ Comment only
+    if (isRowAnchorHandle(sh)) return targetType === "comment";
+    if (isRowAnchorHandle(th)) return sourceType === "comment";
+
+    // LogView data output → Filter / Marker only
+    if (sh === sourceLogViewOutputHandleId) {
+      return targetType === "filter" || targetType === "marking";
+    }
+
+    // Condition output → Filter / Marker / DerivedLogView
+    if (sh === conditionBaseOutputHandleId) {
+      return targetType === "filter" || targetType === "marking" || targetType === "derivedLogView";
+    }
+
+    // Comment source handles may only target row-anchor handles (already handled above)
+    if (sourceType === "comment") return false;
+
+    // Only one connection per target handle for single-input node types
+    if (SINGLE_INPUT_TYPES.has(targetType)) {
       const alreadyConnected = edges.some(
-        (e) =>
-          e.target === connection.target &&
-          e.targetHandle === connection.targetHandle,
+        (e) => e.target === connection.target && e.targetHandle === th,
       );
       if (alreadyConnected) return false;
     }

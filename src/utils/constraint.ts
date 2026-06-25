@@ -82,11 +82,29 @@ export const conditionBaseInputHandleId = "condition-input";
 export const conditionBaseOutputHandleId = "condition-output";
 export const derivedLogViewInputHandleId = "derived-log-view-input";
 export const sourceLogViewOutputHandleId = "source-log-view-output";
-export const logViewRowSelectionHandleId = "log-view-row-selection";
 export const commentNodeTopHandleID = "comment-top";
 export const commentNodeBottomHandleID = "comment-bottom";
 export const commentNodeLeftHandleID = "comment-left";
 export const commentNodeRightHandleID = "comment-right";
+
+/** Prefix for dynamically generated row-anchor handle IDs (e.g. "row-anchor:<uuid>"). */
+export const ROW_ANCHOR_HANDLE_PREFIX = "row-anchor:";
+
+export function isRowAnchorHandle(id: string | null | undefined): id is string {
+  return typeof id === "string" && id.startsWith(ROW_ANCHOR_HANDLE_PREFIX);
+}
+
+export function isCommentHandle(id: string | null | undefined): boolean {
+  return (
+    id === commentNodeTopHandleID ||
+    id === commentNodeBottomHandleID ||
+    id === commentNodeLeftHandleID ||
+    id === commentNodeRightHandleID
+  );
+}
+
+/** Height of a single log row in pixels (must match the virtualizer estimateSize). */
+export const ROW_HEIGHT = 28;
 
 // Comment node colors
 export const COMMENT_BG: Record<MarkColor, string> = {

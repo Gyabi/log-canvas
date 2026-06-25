@@ -3,7 +3,6 @@ import {
   Handle,
   NodeResizer,
   Position,
-  useEdges,
   useReactFlow,
   type NodeProps,
 } from "@xyflow/react";
@@ -13,7 +12,7 @@ import LogViewDisplay from "./LogViewDisplay";
 import { useDerivedViewSync } from "./useDerivedViewSync";
 import { collectUpstreamChain } from "../../utils/graphTraversal";
 import { computeMarks, EMPTY_MARKS } from "../../utils";
-import { derivedLogViewInputHandleId, logViewRowSelectionHandleId } from "../../utils/constraint";
+import { derivedLogViewInputHandleId } from "../../utils/constraint";
 import type { DerivedLogViewData, DerivedLogViewNodeType } from "../../types/logView";
 import type { MarkColor } from "../../utils/constraint";
 
@@ -27,12 +26,7 @@ export default function DerivedLogViewNode({
   useDerivedViewSync(id, data);
 
   const { getNodes, getEdges, updateNodeData } = useReactFlow();
-  const edges = useEdges();
   const lv = useLogView(data.viewId, data.rowCount);
-
-  const hasRowSelectionConnection = edges.some(
-    (e) => e.source === id && e.sourceHandle === logViewRowSelectionHandleId,
-  );
 
   useEffect(() => {
     if (data.jumpRequest == null) return;
@@ -46,8 +40,6 @@ export default function DerivedLogViewNode({
     return computeMarks(lv.rowCache, data.markingRules);
   }, [lv.rowCache, data.markingRules]);
 
-  // Double-click: traverse the upstream chain to find the SourceLogView,
-  // then send a jumpRequest so it scrolls to the corresponding source row.
   const handleRowDoubleClick = useCallback(
     async (derivedRowIndex: number) => {
       if (!data.viewId) return;
@@ -56,7 +48,6 @@ export default function DerivedLogViewNode({
       if (!chain) return;
 
       if (data.viewId === chain.sourceViewId) {
-        // No filters active — derived row index equals source row index.
         updateNodeData(chain.sourceNodeId, { jumpRequest: derivedRowIndex });
         return;
       }
@@ -64,12 +55,12 @@ export default function DerivedLogViewNode({
       const result = await commands.getSourceRowIndex(
         data.viewId,
         derivedRowIndex,
-        chain.sourceViewId
+        chain.sourceViewId,
       );
       if (result.status !== "ok") return;
       updateNodeData(chain.sourceNodeId, { jumpRequest: result.data });
     },
-    [id, data.viewId, getNodes, getEdges, updateNodeData]
+    [id, data.viewId, getNodes, getEdges, updateNodeData],
   );
 
   return (
@@ -100,8 +91,6 @@ export default function DerivedLogViewNode({
         emptyMessage="No rows match the criteria"
         marks={marks}
         onRowDoubleClick={handleRowDoubleClick}
-        selectionHandleId={logViewRowSelectionHandleId}
-        hasSelectionConnection={hasRowSelectionConnection}
         nodeId={id}
       />
     </div>

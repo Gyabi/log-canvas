@@ -3,6 +3,21 @@ import type { MarkingRule } from "./condition";
 
 export type TsMode = "abs" | "rel" | "us";
 
+/** A persisted row-range anchor associated with a unique handle on a LogView node. */
+export type RowAnchor = {
+  handleId: string;
+  minRow: number;
+  maxRow: number;
+};
+
+/** Scroll metrics written to node data so CommentNodes can track row positions. */
+export type LogViewScrollState = {
+  scrollTop: number;
+  scrollContainerHeight: number;
+  wrapperOffsetTop: number;
+  headerHeight: number;
+};
+
 export type SourceLogViewData = {
   /** UUID assigned at open_dlt_file time. Not the file path. */
   viewId?: string;
@@ -11,6 +26,10 @@ export type SourceLogViewData = {
   rowCount?: number;
   /** Set to a 0-based row index to request a scroll jump; cleared after handling. */
   jumpRequest?: number;
+  /** Persisted row-anchor handles (connected comments). Managed by useRowHandles. */
+  rowAnchors?: RowAnchor[];
+  /** Current scroll metrics for connected CommentNodes. Updated by LogViewDisplay. */
+  scrollState?: LogViewScrollState;
 };
 export type SourceLogViewNodeType = Node<SourceLogViewData, "sourceLogView">;
 
@@ -28,5 +47,9 @@ export type DerivedLogViewData = {
   markingRules?: MarkingRule[];
   /** Set to a 0-based row index to request a scroll jump; cleared after handling. */
   jumpRequest?: number;
+  /** Persisted row-anchor handles (connected comments). Managed by useRowHandles. */
+  rowAnchors?: RowAnchor[];
+  /** Current scroll metrics for connected CommentNodes. Updated by LogViewDisplay. */
+  scrollState?: LogViewScrollState;
 };
 export type DerivedLogViewNodeType = Node<DerivedLogViewData, "derivedLogView">;

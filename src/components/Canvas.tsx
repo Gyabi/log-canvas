@@ -2,6 +2,7 @@ import {
   ReactFlow,
   Background,
   BackgroundVariant,
+  ConnectionMode,
   Controls,
   MiniMap,
   addEdge,
@@ -40,7 +41,11 @@ export default function Canvas() {
     if (!targetNode) return false;
 
     if (SINGLE_INPUT_TYPES.has(targetNode.type ?? "")) {
-      const alreadyConnected = edges.some((e) => e.target === connection.target);
+      const alreadyConnected = edges.some(
+        (e) =>
+          e.target === connection.target &&
+          e.targetHandle === connection.targetHandle,
+      );
       if (alreadyConnected) return false;
     }
 
@@ -130,6 +135,7 @@ export default function Canvas() {
         onConnect={onConnect}
         onNodesDelete={onNodesDelete}
         isValidConnection={isValidConnection}
+        connectionMode={ConnectionMode.Loose}
         nodeTypes={nodeTypes}
         panOnDrag
         zoomOnScroll

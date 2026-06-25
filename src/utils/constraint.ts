@@ -82,6 +82,7 @@ export const conditionBaseInputHandleId = "condition-input";
 export const conditionBaseOutputHandleId = "condition-output";
 export const derivedLogViewInputHandleId = "derived-log-view-input";
 export const sourceLogViewOutputHandleId = "source-log-view-output";
+export const logViewRowSelectionHandleId = "log-view-row-selection";
 export const commentNodeTopHandleID = "comment-top";
 export const commentNodeBottomHandleID = "comment-bottom";
 export const commentNodeLeftHandleID = "comment-left";

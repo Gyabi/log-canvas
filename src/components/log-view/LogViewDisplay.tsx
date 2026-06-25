@@ -1,15 +1,28 @@
-import { useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { Handle, Position, useUpdateNodeInternals } from "@xyflow/react";
 import type { useLogView } from "./useLogView";
 import type { DltRow } from "../../bindings";
 import { MARK_BG } from "../../utils/constraint";
 import type { MarkColor } from "../../utils/constraint";
-import { TS_MODES, TS_LABELS, formatTs, levelClass } from "../../utils/dltFormat";
+import {
+  TS_MODES,
+  TS_LABELS,
+  formatTs,
+  levelClass,
+} from "../../utils/dltFormat";
 import type { TsMode } from "../../types/logView";
+
+const ROW_HEIGHT = 28;
 
 type Props = ReturnType<typeof useLogView> & {
   emptyMessage: string;
   marks?: ReadonlyMap<number, MarkColor>;
   onRowDoubleClick?: (rowIndex: number) => void;
+  /** If provided, a selection handle appears when rows are selected or the handle is connected. */
+  selectionHandleId?: string;
+  hasSelectionConnection?: boolean;
+  /** Node id — required when selectionHandleId is set so updateNodeInternals can re-register the dynamic handle. */
+  nodeId?: string;
 };
 
 export default function LogViewDisplay({
@@ -27,9 +40,47 @@ export default function LogViewDisplay({
   emptyMessage,
   marks,
   onRowDoubleClick,
+  selectionHandleId,
+  hasSelectionConnection = false,
+  nodeId,
 }: Props) {
+  const updateNodeInternals = useUpdateNodeInternals();
+
   const [jumpInputVisible, setJumpInputVisible] = useState(false);
   const [jumpValue, setJumpValue] = useState("");
+  const [scrollTop, setScrollTop] = useState(0);
+  const [headerHeight, setHeaderHeight] = useState(30);
+  const [scrollContainerHeight, setScrollContainerHeight] = useState(200);
+  // Distance from this wrapper to the React Flow node root (no position:relative here,
+  // so Handle's position:absolute propagates to .react-flow__node via offsetParent chain).
+  const [wrapperOffsetTop, setWrapperOffsetTop] = useState(0);
+  const wrapperRef = useRef<HTMLDivElement>(null);
+  const headerRef = useRef<HTMLDivElement>(null);
+
+  // useLayoutEffect fires synchronously after DOM mutations, before paint.
+  useLayoutEffect(() => {
+    if (wrapperRef.current) setWrapperOffsetTop(wrapperRef.current.offsetTop);
+  }, []);
+
+  useEffect(() => {
+    const el = headerRef.current;
+    if (!el) return;
+    const obs = new ResizeObserver(() => setHeaderHeight(el.offsetHeight));
+    obs.observe(el);
+    setHeaderHeight(el.offsetHeight);
+    return () => obs.disconnect();
+  }, []);
+
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const obs = new ResizeObserver(() =>
+      setScrollContainerHeight(el.clientHeight)
+    );
+    obs.observe(el);
+    setScrollContainerHeight(el.clientHeight);
+    return () => obs.disconnect();
+  }, [scrollRef]);
 
   const virtualItems = virtualizer.getVirtualItems();
 
@@ -78,10 +129,56 @@ export default function LogViewDisplay({
     }
   }
 
+  // Top in px from the React Flow node root, or null to hide the handle.
+  const handleTopPx = useMemo((): number | null => {
+    if (selectionHandleId === undefined) return null;
+
+    const scrollAreaTop = wrapperOffsetTop + headerHeight;
+
+    if (selectedRows.size === 0) {
+      return hasSelectionConnection
+        ? scrollAreaTop + scrollContainerHeight / 2
+        : null;
+    }
+
+    const indices = [...selectedRows];
+    const minIdx = Math.min(...indices);
+    const maxIdx = Math.max(...indices);
+    const midContentY = ((minIdx + maxIdx + 1) / 2) * ROW_HEIGHT;
+    const midVisibleY = midContentY - scrollTop;
+
+    if (midVisibleY < 0 || midVisibleY > scrollContainerHeight) {
+      return hasSelectionConnection
+        ? scrollAreaTop + scrollContainerHeight / 2
+        : null;
+    }
+
+    return scrollAreaTop + midVisibleY;
+  }, [
+    selectionHandleId,
+    selectedRows,
+    scrollTop,
+    headerHeight,
+    scrollContainerHeight,
+    wrapperOffsetTop,
+    hasSelectionConnection,
+  ]);
+
+  // Re-register the dynamic handle with React Flow whenever it appears, disappears, or moves.
+  // Without this, nodeLookup never learns about the handle and connections cannot start.
+  useEffect(() => {
+    if (nodeId && selectionHandleId !== undefined) updateNodeInternals(nodeId);
+  }, [nodeId, selectionHandleId, handleTopPx, updateNodeInternals]);
+
   return (
-    <>
+    // No position:relative — keeps this wrapper static so the Handle's position:absolute
+    // propagates to the React Flow node root (.react-flow__node), same as other handles.
+    <div ref={wrapperRef} className="flex flex-col flex-1 min-h-0">
       {/* Column headers */}
-      <div className="nodrag shrink-0 flex items-center border-b border-neutral-700 bg-neutral-800 px-2 py-1 font-mono text-xs text-neutral-500 select-none">
+      <div
+        ref={headerRef}
+        className="nodrag shrink-0 flex items-center border-b border-neutral-700 bg-neutral-800 px-2 py-1 font-mono text-xs text-neutral-500 select-none"
+      >
         <span className="w-10 shrink-0">#</span>
         <button
           onClick={cycleTsMode}
@@ -101,6 +198,7 @@ export default function LogViewDisplay({
         ref={scrollRef}
         className="nodrag nowheel flex-1 overflow-y-auto"
         onClick={clearSelection}
+        onScroll={(e) => setScrollTop(e.currentTarget.scrollTop)}
       >
         {rowCount > 0 ? (
           <div
@@ -211,6 +309,18 @@ export default function LogViewDisplay({
           </button>
         )}
       </div>
-    </>
+
+      {/* Row selection handle — Loose connectionMode lets any node connect to/from it.
+          position:absolute here propagates to the React Flow node root. */}
+      {handleTopPx !== null && (
+        <Handle
+          type="source"
+          position={Position.Right}
+          id={selectionHandleId}
+          className="!bg-orange-500 !border-orange-300 !w-3 !h-3"
+          style={{ top: handleTopPx, transform: "translateY(-50%)" }}
+        />
+      )}
+    </div>
   );
 }

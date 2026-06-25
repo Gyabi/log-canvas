@@ -3,6 +3,7 @@ import {
   Handle,
   NodeResizer,
   Position,
+  useEdges,
   useReactFlow,
   type NodeProps,
 } from "@xyflow/react";
@@ -12,7 +13,7 @@ import LogViewDisplay from "./LogViewDisplay";
 import { useDerivedViewSync } from "./useDerivedViewSync";
 import { collectUpstreamChain } from "../../utils/graphTraversal";
 import { computeMarks, EMPTY_MARKS } from "../../utils";
-import { derivedLogViewInputHandleId } from "../../utils/constraint";
+import { derivedLogViewInputHandleId, logViewRowSelectionHandleId } from "../../utils/constraint";
 import type { DerivedLogViewData, DerivedLogViewNodeType } from "../../types/logView";
 import type { MarkColor } from "../../utils/constraint";
 
@@ -26,7 +27,12 @@ export default function DerivedLogViewNode({
   useDerivedViewSync(id, data);
 
   const { getNodes, getEdges, updateNodeData } = useReactFlow();
+  const edges = useEdges();
   const lv = useLogView(data.viewId, data.rowCount);
+
+  const hasRowSelectionConnection = edges.some(
+    (e) => e.source === id && e.sourceHandle === logViewRowSelectionHandleId,
+  );
 
   useEffect(() => {
     if (data.jumpRequest == null) return;
@@ -94,6 +100,9 @@ export default function DerivedLogViewNode({
         emptyMessage="No rows match the criteria"
         marks={marks}
         onRowDoubleClick={handleRowDoubleClick}
+        selectionHandleId={logViewRowSelectionHandleId}
+        hasSelectionConnection={hasRowSelectionConnection}
+        nodeId={id}
       />
     </div>
   );

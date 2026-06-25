@@ -4,13 +4,14 @@ import {
   Handle,
   NodeResizer,
   Position,
+  useEdges,
   useReactFlow,
   type NodeProps,
 } from "@xyflow/react";
 import { commands } from "../../bindings";
 import { useLogView } from "./useLogView";
 import LogViewDisplay from "./LogViewDisplay";
-import { sourceLogViewOutputHandleId } from "../../utils/constraint";
+import { sourceLogViewOutputHandleId, logViewRowSelectionHandleId } from "../../utils/constraint";
 import type { SourceLogViewData, SourceLogViewNodeType } from "../../types/logView";
 
 export type { SourceLogViewData, SourceLogViewNodeType };
@@ -21,7 +22,12 @@ export default function SourceLogViewNode({
   selected,
 }: NodeProps<SourceLogViewNodeType>) {
   const { updateNodeData } = useReactFlow();
+  const edges = useEdges();
   const lv = useLogView(data.viewId, data.rowCount ?? 0);
+
+  const hasRowSelectionConnection = edges.some(
+    (e) => e.source === id && e.sourceHandle === logViewRowSelectionHandleId,
+  );
 
   // set jump request
   useEffect(() => {
@@ -75,7 +81,13 @@ export default function SourceLogViewNode({
         </button>
       </div>
 
-      <LogViewDisplay {...lv} emptyMessage="Please open a DLT file" />
+      <LogViewDisplay
+        {...lv}
+        emptyMessage="Please open a DLT file"
+        selectionHandleId={logViewRowSelectionHandleId}
+        hasSelectionConnection={hasRowSelectionConnection}
+        nodeId={id}
+      />
     </div>
   );
 }

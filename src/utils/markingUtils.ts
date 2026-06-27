@@ -1,31 +1,47 @@
-import type { DltRow } from "../../bindings";
-import type { MarkColor, MarkingRule } from "../../types";
+import type { DltRow } from "../bindings";
+import type { MarkingRule } from "../types/condition";
+import type { MarkColor } from "./constraint";
 
 function fieldValue(row: DltRow, field: string): string {
   switch (field) {
-    case "ecuId":   return row.ecuId;
-    case "appId":   return row.appId;
-    case "ctxId":   return row.ctxId;
-    case "level":   return row.level;
-    case "payload": return row.payload;
-    default:        return "";
+    case "ecuId":
+      return row.ecuId;
+    case "appId":
+      return row.appId;
+    case "ctxId":
+      return row.ctxId;
+    case "level":
+      return row.level;
+    case "payload":
+      return row.payload;
+    default:
+      return "";
   }
 }
 
-function rowMatchesRule(row: DltRow, rule: MarkingRule, re: RegExp | null): boolean {
+function rowMatchesRule(
+  row: DltRow,
+  rule: MarkingRule,
+  re: RegExp | null
+): boolean {
   const v = fieldValue(row, rule.field);
   switch (rule.op) {
-    case "eq":       return v === rule.value;
-    case "neq":      return v !== rule.value;
-    case "contains": return v.includes(rule.value);
-    case "regex":    return re?.test(v) ?? false;
-    default:         return false;
+    case "eq":
+      return v === rule.value;
+    case "neq":
+      return v !== rule.value;
+    case "contains":
+      return v.includes(rule.value);
+    case "regex":
+      return re?.test(v) ?? false;
+    default:
+      return false;
   }
 }
 
 export function computeMarks(
   rowCache: Map<number, DltRow>,
-  rules: MarkingRule[],
+  rules: MarkingRule[]
 ): Map<number, MarkColor> {
   const compiled = rules.map((r) => {
     if (r.op !== "regex") return { rule: r, re: null };

@@ -5,19 +5,18 @@ import {
   Position,
   useReactFlow,
   type NodeProps,
-  type Node,
 } from "@xyflow/react";
 import { commands } from "../../bindings";
 import { useLogView } from "./useLogView";
 import LogViewDisplay from "./LogViewDisplay";
-import { computeMarks } from "./markingUtils";
 import { useDerivedViewSync } from "./useDerivedViewSync";
-import type { MarkColor, DerivedLogViewData } from "../../types";
+import { collectUpstreamChain } from "../../utils/graphTraversal";
+import { computeMarks, EMPTY_MARKS } from "../../utils";
+import { derivedLogViewInputHandleId } from "../../utils/constraint";
+import type { DerivedLogViewData, DerivedLogViewNodeType } from "../../types/logView";
+import type { MarkColor } from "../../utils/constraint";
 
-export type { DerivedLogViewData };
-export type DerivedLogViewNodeType = Node<DerivedLogViewData, "derivedLogView">;
-
-const EMPTY_MARKS: ReadonlyMap<number, MarkColor> = new Map();
+export type { DerivedLogViewData, DerivedLogViewNodeType };
 
 export default function DerivedLogViewNode({
   id,
@@ -41,49 +40,25 @@ export default function DerivedLogViewNode({
     return computeMarks(lv.rowCache, data.markingRules);
   }, [lv.rowCache, data.markingRules]);
 
-  // Double-click: find the upstream SourceLogViewNode through condition nodes
-  // and send a jumpRequest so it scrolls to the same source row.
   const handleRowDoubleClick = useCallback(
     async (derivedRowIndex: number) => {
       if (!data.viewId) return;
 
-      const nodes = getNodes();
-      const edges = getEdges();
-      const incomingEdges = edges.filter((e) => e.target === id);
+      const chain = collectUpstreamChain(id, getNodes(), getEdges());
+      if (!chain) return;
 
-      // Traverse condition node → upstream log view
-      let upstreamViewId: string | undefined;
-      let upstreamNodeId: string | undefined;
-      for (const condEdge of incomingEdges) {
-        const condNode = nodes.find((n) => n.id === condEdge.source);
-        if (!condNode) continue;
-        const logViewEdge = edges.find((e) => e.target === condNode.id);
-        const logViewNode = logViewEdge
-          ? nodes.find((n) => n.id === logViewEdge.source)
-          : undefined;
-        const vid = (logViewNode?.data as { viewId?: string } | undefined)?.viewId;
-        if (vid && logViewNode) {
-          upstreamViewId = vid;
-          upstreamNodeId = logViewNode.id;
-          break;
-        }
-      }
-      if (!upstreamViewId || !upstreamNodeId) return;
-
-      if (data.viewId === upstreamViewId) {
-        // No filtering active — row index is the same in the upstream view.
-        updateNodeData(upstreamNodeId, { jumpRequest: derivedRowIndex });
+      if (data.viewId === chain.sourceViewId) {
+        updateNodeData(chain.sourceNodeId, { jumpRequest: derivedRowIndex });
         return;
       }
 
-      // Filtered view: ask Rust to map the derived row index to the source row index.
       const result = await commands.getSourceRowIndex(
         data.viewId,
         derivedRowIndex,
-        upstreamViewId,
+        chain.sourceViewId,
       );
       if (result.status !== "ok") return;
-      updateNodeData(upstreamNodeId, { jumpRequest: result.data });
+      updateNodeData(chain.sourceNodeId, { jumpRequest: result.data });
     },
     [id, data.viewId, getNodes, getEdges, updateNodeData],
   );
@@ -94,13 +69,17 @@ export default function DerivedLogViewNode({
       style={{ width: "100%", height: "100%" }}
     >
       <NodeResizer isVisible={selected} minWidth={400} minHeight={200} />
-      {/* target only: DerivedLogViewNode is always the terminal node in the graph */}
-      <Handle type="target" position={Position.Left} />
+      {/* DerivedLogView is always the terminal node — target handle only */}
+      <Handle
+        type="target"
+        position={Position.Left}
+        id={derivedLogViewInputHandleId}
+      />
 
       <div className="shrink-0 flex items-center gap-2 border-b border-violet-800 bg-violet-950 px-3 py-2 cursor-grab active:cursor-grabbing">
         <span className="text-xs text-violet-400">▶ derive</span>
         <span className="flex-1 truncate text-xs font-semibold text-neutral-300">
-          {data.label ?? (data.viewId?.slice(0, 8) ?? "…")}
+          {data.label ?? data.viewId?.slice(0, 8) ?? "…"}
         </span>
         <span className="shrink-0 text-xs text-neutral-500">
           {data.rowCount.toLocaleString()} rows
@@ -112,6 +91,7 @@ export default function DerivedLogViewNode({
         emptyMessage="No rows match the criteria"
         marks={marks}
         onRowDoubleClick={handleRowDoubleClick}
+        nodeId={id}
       />
     </div>
   );

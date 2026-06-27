@@ -2,69 +2,83 @@ import {
   ReactFlow,
   Background,
   BackgroundVariant,
+  ConnectionMode,
   Controls,
   MiniMap,
   addEdge,
   useNodesState,
   useEdgesState,
   type Node,
+  type Edge,
   type Connection,
 } from "@xyflow/react";
-import { FileText, SlidersHorizontal, Palette } from "lucide-react";
+import { FileText, SlidersHorizontal, Palette, Sparkle, MessageSquare } from "lucide-react";
 import { commands } from "../bindings";
 import SourceLogViewNode from "./log-view/SourceLogViewNode";
 import DerivedLogViewNode from "./log-view/DerivedLogViewNode";
 import FilterNode from "./condition/FilterNode";
 import MarkingNode from "./condition/MarkingNode";
-import type { SourceLogViewData, DerivedLogViewData } from "../types";
+import CommentNode from "./comment/CommentNode";
+import { ToolBar } from "./tool-bar/toolBar";
+import {
+  NODE_TEMPLATES,
+  SINGLE_INPUT_TYPES,
+  isRowAnchorHandle,
+  sourceLogViewOutputHandleId,
+  conditionBaseOutputHandleId,
+} from "../utils/constraint";
+import type { SourceLogViewData } from "../types/logView";
+import type { DerivedLogViewData } from "../types/logView";
 
 const nodeTypes = {
   sourceLogView: SourceLogViewNode,
   derivedLogView: DerivedLogViewNode,
   filter: FilterNode,
   marking: MarkingNode,
+  comment: CommentNode,
 };
-
-type ToolButtonProps = {
-  icon: React.ReactNode;
-  label: string;
-  description: string;
-  onClick: () => void;
-  accent: string;
-};
-
-function ToolButton({
-  icon,
-  label,
-  description,
-  onClick,
-  accent,
-}: ToolButtonProps) {
-  return (
-    <button
-      onClick={onClick}
-      className={`group flex items-center gap-3 rounded-lg px-3 py-2.5 text-left transition-all hover:bg-neutral-700/60 active:scale-95 active:bg-neutral-700`}
-    >
-      <span
-        className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-md ${accent}`}
-      >
-        {icon}
-      </span>
-      <span className="min-w-0">
-        <span className="block text-xs font-semibold text-neutral-200">
-          {label}
-        </span>
-        <span className="block text-[10px] text-neutral-500">
-          {description}
-        </span>
-      </span>
-    </button>
-  );
-}
 
 export default function Canvas() {
   const [nodes, setNodes, onNodesChange] = useNodesState<Node>([]);
-  const [edges, setEdges, onEdgesChange] = useEdgesState([]);
+  const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
+
+  function isValidConnection(connection: Edge | Connection): boolean {
+    const sourceNode = nodes.find((n) => n.id === connection.source);
+    const targetNode = nodes.find((n) => n.id === connection.target);
+    if (!sourceNode || !targetNode) return false;
+
+    const sh = connection.sourceHandle ?? "";
+    const th = connection.targetHandle ?? "";
+    const sourceType = sourceNode.type ?? "";
+    const targetType = targetNode.type ?? "";
+
+    // Row-anchor handle ↔ Comment only
+    if (isRowAnchorHandle(sh)) return targetType === "comment";
+    if (isRowAnchorHandle(th)) return sourceType === "comment";
+
+    // LogView data output → Filter / Marker only
+    if (sh === sourceLogViewOutputHandleId) {
+      return targetType === "filter" || targetType === "marking";
+    }
+
+    // Condition output → Filter / Marker / DerivedLogView
+    if (sh === conditionBaseOutputHandleId) {
+      return targetType === "filter" || targetType === "marking" || targetType === "derivedLogView";
+    }
+
+    // Comment source handles may only target row-anchor handles (already handled above)
+    if (sourceType === "comment") return false;
+
+    // Only one connection per target handle for single-input node types
+    if (SINGLE_INPUT_TYPES.has(targetType)) {
+      const alreadyConnected = edges.some(
+        (e) => e.target === connection.target && e.targetHandle === th,
+      );
+      if (alreadyConnected) return false;
+    }
+
+    return true;
+  }
 
   function onConnect(params: Connection) {
     setEdges((eds) => addEdge(params, eds));
@@ -82,48 +96,64 @@ export default function Canvas() {
     }
   }
 
-  function addSourceLogViewNode() {
-    const id = `source-${crypto.randomUUID()}`;
+  function addNode(type: keyof typeof NODE_TEMPLATES) {
+    const template = NODE_TEMPLATES[type];
     const offset = (nodes.length % 5) * 40;
+
     setNodes((prev) => [
       ...prev,
       {
-        id,
-        type: "sourceLogView",
-        position: { x: 80 + offset, y: 80 + offset },
-        data: {},
-        style: { width: 1280, height: 720 },
+        id: `${type}-${crypto.randomUUID()}`,
+        type,
+        position: {
+          x: template.position.x + offset,
+          y: template.position.y + offset,
+        },
+        data: structuredClone(template.data),
+        style: template.style,
+        // Comment nodes must always render above LogView nodes.
+        ...(type === "comment" ? { zIndex: 1000 } : {}),
       },
     ]);
   }
 
-  function addFilterNode() {
-    const id = `filter-${crypto.randomUUID()}`;
-    const offset = (nodes.length % 5) * 40;
-    setNodes((prev) => [
-      ...prev,
-      {
-        id,
-        type: "filter",
-        position: { x: 200 + offset, y: 200 + offset },
-        data: { filters: [] },
-      },
-    ]);
-  }
-
-  function addMarkingNode() {
-    const id = `marking-${crypto.randomUUID()}`;
-    const offset = (nodes.length % 5) * 40;
-    setNodes((prev) => [
-      ...prev,
-      {
-        id,
-        type: "marking",
-        position: { x: 200 + offset, y: 300 + offset },
-        data: { rules: [] },
-      },
-    ]);
-  }
+  const toolbarItems = [
+    {
+      type: "sourceLogView",
+      icon: <FileText size={16} className="text-blue-300" />,
+      label: "Log File",
+      description: "DLT source view",
+      accent: "bg-blue-900/60",
+    },
+    {
+      type: "filter",
+      icon: <SlidersHorizontal size={16} className="text-amber-300" />,
+      label: "Filter",
+      description: "Row filter conditions",
+      accent: "bg-amber-900/60",
+    },
+    {
+      type: "marking",
+      icon: <Palette size={16} className="text-purple-300" />,
+      label: "Marking",
+      description: "Color highlight rules",
+      accent: "bg-purple-900/60",
+    },
+    {
+      type: "derivedLogView",
+      icon: <Sparkle size={16} className="text-green-300" />,
+      label: "Output",
+      description: "Derived log view",
+      accent: "bg-green-900/60",
+    },
+    {
+      type: "comment",
+      icon: <MessageSquare size={16} className="text-yellow-300" />,
+      label: "Comment",
+      description: "Add a note",
+      accent: "bg-yellow-900/60",
+    },
+  ] as const;
 
   return (
     <div className="relative h-full w-full">
@@ -134,6 +164,8 @@ export default function Canvas() {
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}
         onNodesDelete={onNodesDelete}
+        isValidConnection={isValidConnection}
+        connectionMode={ConnectionMode.Loose}
         nodeTypes={nodeTypes}
         panOnDrag
         zoomOnScroll
@@ -156,36 +188,13 @@ export default function Canvas() {
       </ReactFlow>
 
       {/* Floating toolbar */}
-      <div className="absolute left-4 top-4 z-10 flex flex-col overflow-hidden rounded-xl border border-neutral-700 bg-neutral-800/95 shadow-2xl backdrop-blur-sm">
-        <div className="border-b border-neutral-700 px-3 py-2">
-          <span className="text-[10px] font-semibold uppercase tracking-widest text-neutral-500">
-            ADD NODE
-          </span>
-        </div>
-        <div className="flex gap-0.5 p-1.5">
-          <ToolButton
-            icon={<FileText size={16} className="text-blue-300" />}
-            label="Log File"
-            description="DLT source view"
-            onClick={addSourceLogViewNode}
-            accent="bg-blue-900/60"
-          />
-          <ToolButton
-            icon={<SlidersHorizontal size={16} className="text-amber-300" />}
-            label="Filter"
-            description="Row filter conditions"
-            onClick={addFilterNode}
-            accent="bg-amber-900/60"
-          />
-          <ToolButton
-            icon={<Palette size={16} className="text-purple-300" />}
-            label="Marking"
-            description="Color highlight rules"
-            onClick={addMarkingNode}
-            accent="bg-purple-900/60"
-          />
-        </div>
-      </div>
+      <ToolBar
+        title="ADD NODE"
+        items={toolbarItems.map((item) => ({
+          ...item,
+          onClick: () => addNode(item.type),
+        }))}
+      />
     </div>
   );
 }

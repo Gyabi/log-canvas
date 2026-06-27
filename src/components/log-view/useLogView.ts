@@ -2,8 +2,9 @@ import { useEffect, useReducer, useRef, useState } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { commands } from "../../bindings";
 import type { DltRow } from "../../bindings";
+import type { TsMode } from "../../types/logView";
 
-export type TsMode = "abs" | "rel" | "us";
+export type { TsMode };
 
 const FETCH_SIZE = 100;
 

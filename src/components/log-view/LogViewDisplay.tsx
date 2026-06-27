@@ -1,27 +1,25 @@
-import { useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { Handle, Position, useReactFlow, useUpdateNodeInternals } from "@xyflow/react";
 import type { useLogView } from "./useLogView";
-import type { TsMode } from "./useLogView";
 import type { DltRow } from "../../bindings";
-import type { MarkColor } from "../../types";
-
-// Re-export for consumers that import display types from this file.
-export type { MarkColor };
-
-const MARK_BG: Record<MarkColor, string> = {
-  red: "bg-red-900/50",
-  yellow: "bg-amber-900/50",
-  green: "bg-green-900/50",
-  blue: "bg-blue-900/50",
-  purple: "bg-purple-900/50",
-};
-
-const TS_MODES: TsMode[] = ["abs", "rel", "us"];
-const TS_LABELS: Record<TsMode, string> = { abs: "ABS", rel: "REL", us: "μs" };
+import { MARK_BG, ROW_HEIGHT } from "../../utils/constraint";
+import type { MarkColor } from "../../utils/constraint";
+import {
+  TS_MODES,
+  TS_LABELS,
+  formatTs,
+  levelClass,
+} from "../../utils/dltFormat";
+import type { TsMode } from "../../types/logView";
+import type { RowAnchor, LogViewScrollState } from "../../types/logView";
+import { useRowHandles } from "./useRowHandles";
 
 type Props = ReturnType<typeof useLogView> & {
   emptyMessage: string;
   marks?: ReadonlyMap<number, MarkColor>;
   onRowDoubleClick?: (rowIndex: number) => void;
+  /** Required for row-anchor handle management. */
+  nodeId: string;
 };
 
 export default function LogViewDisplay({
@@ -39,9 +37,72 @@ export default function LogViewDisplay({
   emptyMessage,
   marks,
   onRowDoubleClick,
+  nodeId,
 }: Props) {
+  const { updateNodeData } = useReactFlow();
+  const updateNodeInternals = useUpdateNodeInternals();
+
   const [jumpInputVisible, setJumpInputVisible] = useState(false);
   const [jumpValue, setJumpValue] = useState("");
+
+  // Scroll metrics used to position row-anchor handles and for CommentNode tracking.
+  const [scrollTop, setScrollTop] = useState(0);
+  const [headerHeight, setHeaderHeight] = useState(30);
+  const [scrollContainerHeight, setScrollContainerHeight] = useState(200);
+  const [wrapperOffsetTop, setWrapperOffsetTop] = useState(0);
+
+  const wrapperRef = useRef<HTMLDivElement>(null);
+  const headerRef = useRef<HTMLDivElement>(null);
+
+  // Measure wrapperOffsetTop synchronously to avoid a flash of wrong handle position.
+  useLayoutEffect(() => {
+    if (wrapperRef.current) setWrapperOffsetTop(wrapperRef.current.offsetTop);
+  }, []);
+
+  // Track column-header height.
+  useEffect(() => {
+    const el = headerRef.current;
+    if (!el) return;
+    const obs = new ResizeObserver(() => setHeaderHeight(el.offsetHeight));
+    obs.observe(el);
+    setHeaderHeight(el.offsetHeight);
+    return () => obs.disconnect();
+  }, []);
+
+  // Track scroll-body height.
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const obs = new ResizeObserver(() => setScrollContainerHeight(el.clientHeight));
+    obs.observe(el);
+    setScrollContainerHeight(el.clientHeight);
+    return () => obs.disconnect();
+  }, [scrollRef]);
+
+  // Sync scroll state to node data so connected CommentNodes can track positions.
+  const prevScrollStateRef = useRef<LogViewScrollState | null>(null);
+  useEffect(() => {
+    const next: LogViewScrollState = { scrollTop, scrollContainerHeight, wrapperOffsetTop, headerHeight };
+    const prev = prevScrollStateRef.current;
+    if (
+      prev &&
+      prev.scrollTop === next.scrollTop &&
+      prev.scrollContainerHeight === next.scrollContainerHeight &&
+      prev.wrapperOffsetTop === next.wrapperOffsetTop &&
+      prev.headerHeight === next.headerHeight
+    ) return;
+    prevScrollStateRef.current = next;
+    updateNodeData(nodeId, { scrollState: next });
+  }, [scrollTop, scrollContainerHeight, wrapperOffsetTop, headerHeight, nodeId, updateNodeData]);
+
+  // Row-anchor handle management (multiple handles, pending + connected).
+  const rowHandles = useRowHandles(nodeId, selectedRows);
+
+  // Keep React Flow in sync whenever scroll moves handles.
+  const rowHandleCount = rowHandles.length;
+  useEffect(() => {
+    if (rowHandleCount > 0) updateNodeInternals(nodeId);
+  }, [scrollTop, headerHeight, rowHandleCount, nodeId, updateNodeInternals]);
 
   const virtualItems = virtualizer.getVirtualItems();
 
@@ -70,7 +131,7 @@ export default function LogViewDisplay({
           r.ctxId,
           r.level,
           r.payload,
-        ].join("\t")
+        ].join("\t"),
       )
       .join("\n");
 
@@ -80,7 +141,6 @@ export default function LogViewDisplay({
   function handleJumpKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
     if (e.key === "Enter") {
       const n = parseInt(jumpValue, 10);
-      // User enters 1-based row number; scrollToIndex is 0-based.
       if (!Number.isNaN(n)) scrollToIndex(n - 1);
       setJumpInputVisible(false);
       setJumpValue("");
@@ -90,16 +150,33 @@ export default function LogViewDisplay({
     }
   }
 
+  /**
+   * Compute the handle's top position (px from the React Flow node root) for a given anchor.
+   * Returns null when the anchor row is scrolled out of view and no edge is connected.
+   */
+  function anchorTopPx(anchor: RowAnchor): number | null {
+    const scrollAreaTop = wrapperOffsetTop + headerHeight;
+    const midContent = ((anchor.minRow + anchor.maxRow + 1) / 2) * ROW_HEIGHT;
+    const midVisible = midContent - scrollTop;
+    if (midVisible < 0 || midVisible > scrollContainerHeight) return null;
+    return scrollAreaTop + midVisible;
+  }
+
   return (
-    <>
+    // No position:relative — keeps this wrapper static so the Handle's position:absolute
+    // propagates to the React Flow node root (.react-flow__node), same as other handles.
+    <div ref={wrapperRef} className="flex flex-col flex-1 min-h-0">
       {/* Column headers */}
-      <div className="nodrag shrink-0 flex items-center border-b border-neutral-700 bg-neutral-800 px-2 py-1 font-mono text-xs text-neutral-500 select-none">
+      <div
+        ref={headerRef}
+        className="nodrag shrink-0 flex items-center border-b border-neutral-700 bg-neutral-800 px-2 py-1 font-mono text-xs text-neutral-500 select-none"
+      >
         <span className="w-10 shrink-0">#</span>
         <button
           onClick={cycleTsMode}
           className="nodrag w-28 shrink-0 text-left hover:text-neutral-300"
         >
-          {`Timestamp [${TS_LABELS[tsMode]}]`}
+          {`Timestamp [${TS_LABELS[tsMode as TsMode]}]`}
         </button>
         <span className="w-12 shrink-0">ECU</span>
         <span className="w-12 shrink-0">App</span>
@@ -113,11 +190,10 @@ export default function LogViewDisplay({
         ref={scrollRef}
         className="nodrag nowheel flex-1 overflow-y-auto"
         onClick={clearSelection}
+        onScroll={(e) => setScrollTop(e.currentTarget.scrollTop)}
       >
         {rowCount > 0 ? (
-          <div
-            style={{ height: virtualizer.getTotalSize(), position: "relative" }}
-          >
+          <div style={{ height: virtualizer.getTotalSize(), position: "relative" }}>
             {virtualItems.map((item) => {
               const row = rowCache.get(item.index);
               const isSelected = selectedRows.has(item.index);
@@ -127,6 +203,9 @@ export default function LogViewDisplay({
                 : markColor
                   ? MARK_BG[markColor]
                   : "";
+              const isAnchored = rowHandles.some(
+                (a) => item.index >= a.minRow && item.index <= a.maxRow,
+              );
 
               return (
                 <div
@@ -138,7 +217,7 @@ export default function LogViewDisplay({
                     right: 0,
                     height: item.size,
                   }}
-                  className={`flex items-center border-b border-neutral-800 px-2 font-mono text-xs hover:bg-neutral-800 cursor-pointer ${bgClass}`}
+                  className={`flex items-center border-b border-neutral-800 px-2 font-mono text-xs hover:bg-neutral-800 cursor-pointer ${bgClass} ${isAnchored ? "ring-1 ring-inset ring-orange-500" : ""}`}
                   onClick={(e) => {
                     e.stopPropagation();
                     handleRowClick(e, item.index);
@@ -150,29 +229,17 @@ export default function LogViewDisplay({
                 >
                   {row ? (
                     <>
-                      <span className="w-10 shrink-0 text-neutral-500">
-                        {row.index}
-                      </span>
+                      <span className="w-10 shrink-0 text-neutral-500">{row.index}</span>
                       <span className="w-28 shrink-0 text-neutral-400">
                         {formatTs(row.timestampUs, tsMode, firstTimestampUs)}
                       </span>
-                      <span className="w-12 shrink-0 text-sky-400">
-                        {row.ecuId}
-                      </span>
-                      <span className="w-12 shrink-0 text-emerald-400">
-                        {row.appId}
-                      </span>
-                      <span className="w-12 shrink-0 text-amber-400">
-                        {row.ctxId}
-                      </span>
-                      <span
-                        className={`w-16 shrink-0 font-semibold ${levelClass(row.level)}`}
-                      >
+                      <span className="w-12 shrink-0 text-sky-400">{row.ecuId}</span>
+                      <span className="w-12 shrink-0 text-emerald-400">{row.appId}</span>
+                      <span className="w-12 shrink-0 text-amber-400">{row.ctxId}</span>
+                      <span className={`w-16 shrink-0 font-semibold ${levelClass(row.level)}`}>
                         {row.level}
                       </span>
-                      <span className="flex-1 truncate text-neutral-200">
-                        {row.payload}
-                      </span>
+                      <span className="flex-1 truncate text-neutral-200">{row.payload}</span>
                     </>
                   ) : (
                     <span className="italic text-neutral-600">…</span>
@@ -223,48 +290,23 @@ export default function LogViewDisplay({
           </button>
         )}
       </div>
-    </>
+
+      {/* Row-anchor handles — one per connected/pending anchor. position:absolute
+          propagates to the React Flow node root because this wrapper is position:static. */}
+      {rowHandles.map((anchor) => {
+        const top = anchorTopPx(anchor);
+        if (top === null) return null;
+        return (
+          <Handle
+            key={anchor.handleId}
+            type="source"
+            position={Position.Right}
+            id={anchor.handleId}
+            className="!bg-orange-500 !border-orange-300 !w-3 !h-3"
+            style={{ top, transform: "translateY(-50%)" }}
+          />
+        );
+      })}
+    </div>
   );
-}
-
-function formatTs(
-  us: number | null,
-  mode: TsMode,
-  baseUs: number | null
-): string {
-  if (us == null) return "—";
-  if (mode === "us") return us.toFixed(0);
-  if (mode === "rel") {
-    const rel = (us - (baseUs ?? us)) / 1_000_000;
-    return `+${rel.toFixed(3)}s`;
-  }
-  const totalSec = Math.floor(us / 1_000_000);
-  const ms = Math.floor((us % 1_000_000) / 1000);
-  const h = Math.floor(totalSec / 3_600)
-    .toString()
-    .padStart(2, "0");
-  const m = Math.floor((totalSec % 3_600) / 60)
-    .toString()
-    .padStart(2, "0");
-  const s = (totalSec % 60).toString().padStart(2, "0");
-  return `${h}:${m}:${s}.${ms.toString().padStart(3, "0")}`;
-}
-
-function levelClass(level: string): string {
-  switch (level) {
-    case "FATAL":
-      return "text-red-500";
-    case "ERROR":
-      return "text-red-400";
-    case "WARN":
-      return "text-amber-400";
-    case "INFO":
-      return "text-green-400";
-    case "DEBUG":
-      return "text-sky-400";
-    case "VERBOSE":
-      return "text-neutral-400";
-    default:
-      return "text-neutral-400";
-  }
 }

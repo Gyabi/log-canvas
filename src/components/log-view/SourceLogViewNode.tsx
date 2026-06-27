@@ -6,14 +6,14 @@ import {
   Position,
   useReactFlow,
   type NodeProps,
-  type Node,
 } from "@xyflow/react";
 import { commands } from "../../bindings";
 import { useLogView } from "./useLogView";
 import LogViewDisplay from "./LogViewDisplay";
-import type { SourceLogViewData } from "../../types";
+import { sourceLogViewOutputHandleId } from "../../utils/constraint";
+import type { SourceLogViewData, SourceLogViewNodeType } from "../../types/logView";
 
-export type SourceLogViewNodeType = Node<SourceLogViewData, "sourceLogView">;
+export type { SourceLogViewData, SourceLogViewNodeType };
 
 export default function SourceLogViewNode({
   id,
@@ -31,7 +31,9 @@ export default function SourceLogViewNode({
   }, [data.jumpRequest]);
 
   async function handleOpenFile() {
-    const path = await open({ filters: [{ name: "DLT", extensions: ["dlt"] }] });
+    const path = await open({
+      filters: [{ name: "DLT", extensions: ["dlt"] }],
+    });
     if (!path) return;
     const fileId = crypto.randomUUID();
     const result = await commands.openDltFile(path, fileId);
@@ -54,7 +56,11 @@ export default function SourceLogViewNode({
       style={{ width: "100%", height: "100%" }}
     >
       <NodeResizer isVisible={selected} minWidth={400} minHeight={200} />
-      <Handle type="source" position={Position.Right} />
+      <Handle
+        type="source"
+        position={Position.Right}
+        id={sourceLogViewOutputHandleId}
+      />
 
       <div className="shrink-0 flex items-center gap-2 border-b border-neutral-700 bg-neutral-800 px-3 py-2 cursor-grab active:cursor-grabbing">
         <span className="flex-1 truncate text-xs font-semibold text-neutral-300">
@@ -68,7 +74,11 @@ export default function SourceLogViewNode({
         </button>
       </div>
 
-      <LogViewDisplay {...lv} emptyMessage="Please open a DLT file" />
+      <LogViewDisplay
+        {...lv}
+        emptyMessage="Please open a DLT file"
+        nodeId={id}
+      />
     </div>
   );
 }

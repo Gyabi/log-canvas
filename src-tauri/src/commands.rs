@@ -170,6 +170,22 @@ pub fn delete_view(view_id: String, state: State<'_, AppState>) -> Result<(), St
     Ok(())
 }
 
+/// Write `json` to `path`, creating or overwriting the file.
+#[specta::specta]
+#[tauri::command]
+#[allow(clippy::needless_pass_by_value)]
+pub fn save_project(path: String, json: String) -> Result<(), String> {
+    std::fs::write(&path, json.as_bytes()).map_err(|e| e.to_string())
+}
+
+/// Read the file at `path` and return its contents as a UTF-8 string.
+#[specta::specta]
+#[tauri::command]
+#[allow(clippy::needless_pass_by_value)]
+pub fn load_project(path: String) -> Result<String, String> {
+    std::fs::read_to_string(&path).map_err(|e| e.to_string())
+}
+
 /// Given a derived view and a zero-based row index within it, return the
 /// corresponding zero-based row index in `source_view_id`.
 ///

@@ -22,6 +22,8 @@ log-canvas is a desktop application that brings log analysis onto an infinite wh
 
 > **Primary target:** DLT log analysis, but designed to be extensible to other log formats.
 
+![sample image](./public/sample.png)
+
 ## Tech Stack
 
 | Layer | Technology |

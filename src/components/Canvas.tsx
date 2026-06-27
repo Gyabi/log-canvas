@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import {
   ReactFlow,
   Background,
@@ -12,20 +13,21 @@ import {
   type Edge,
   type Connection,
 } from "@xyflow/react";
-import { FileText, SlidersHorizontal, Palette, Sparkle, MessageSquare } from "lucide-react";
 import { commands } from "../bindings";
+import { useProjectState } from "../hooks/useProjectState";
+import { ProjectToolbar } from "./tool-bar/ProjectToolbar";
+import { AddNodeToolbar } from "./tool-bar/AddNodeToolbar";
 import SourceLogViewNode from "./log-view/SourceLogViewNode";
 import DerivedLogViewNode from "./log-view/DerivedLogViewNode";
 import FilterNode from "./condition/FilterNode";
 import MarkingNode from "./condition/MarkingNode";
 import CommentNode from "./comment/CommentNode";
-import { ToolBar } from "./tool-bar/toolBar";
 import {
   NODE_TEMPLATES,
   SINGLE_INPUT_TYPES,
   isRowAnchorHandle,
-  sourceLogViewOutputHandleId,
-  conditionBaseOutputHandleId,
+  isSourceLogViewOutputHandle,
+  isConditionOutputHandle,
 } from "../utils/constraint";
 import type { SourceLogViewData } from "../types/logView";
 import type { DerivedLogViewData } from "../types/logView";
@@ -42,6 +44,25 @@ export default function Canvas() {
   const [nodes, setNodes, onNodesChange] = useNodesState<Node>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
 
+  const { currentPath, isDirty, saveAs, saveOverwrite, load } = useProjectState(
+    nodes,
+    edges,
+    setNodes,
+    setEdges
+  );
+
+  // Ctrl+S → overwrite save
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) {
+      if ((e.ctrlKey || e.metaKey) && e.key === "s") {
+        e.preventDefault();
+        void saveOverwrite();
+      }
+    }
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [saveOverwrite]);
+
   function isValidConnection(connection: Edge | Connection): boolean {
     const sourceNode = nodes.find((n) => n.id === connection.source);
     const targetNode = nodes.find((n) => n.id === connection.target);
@@ -52,27 +73,26 @@ export default function Canvas() {
     const sourceType = sourceNode.type ?? "";
     const targetType = targetNode.type ?? "";
 
-    // Row-anchor handle ↔ Comment only
     if (isRowAnchorHandle(sh)) return targetType === "comment";
     if (isRowAnchorHandle(th)) return sourceType === "comment";
 
-    // LogView data output → Filter / Marker only
-    if (sh === sourceLogViewOutputHandleId) {
+    if (isSourceLogViewOutputHandle(sh)) {
       return targetType === "filter" || targetType === "marking";
     }
 
-    // Condition output → Filter / Marker / DerivedLogView
-    if (sh === conditionBaseOutputHandleId) {
-      return targetType === "filter" || targetType === "marking" || targetType === "derivedLogView";
+    if (isConditionOutputHandle(sh)) {
+      return (
+        targetType === "filter" ||
+        targetType === "marking" ||
+        targetType === "derivedLogView"
+      );
     }
 
-    // Comment source handles may only target row-anchor handles (already handled above)
     if (sourceType === "comment") return false;
 
-    // Only one connection per target handle for single-input node types
     if (SINGLE_INPUT_TYPES.has(targetType)) {
       const alreadyConnected = edges.some(
-        (e) => e.target === connection.target && e.targetHandle === th,
+        (e) => e.target === connection.target && e.targetHandle === th
       );
       if (alreadyConnected) return false;
     }
@@ -99,7 +119,6 @@ export default function Canvas() {
   function addNode(type: keyof typeof NODE_TEMPLATES) {
     const template = NODE_TEMPLATES[type];
     const offset = (nodes.length % 5) * 40;
-
     setNodes((prev) => [
       ...prev,
       {
@@ -111,49 +130,14 @@ export default function Canvas() {
         },
         data: structuredClone(template.data),
         style: template.style,
-        // Comment nodes must always render above LogView nodes.
         ...(type === "comment" ? { zIndex: 1000 } : {}),
       },
     ]);
   }
 
-  const toolbarItems = [
-    {
-      type: "sourceLogView",
-      icon: <FileText size={16} className="text-blue-300" />,
-      label: "Log File",
-      description: "DLT source view",
-      accent: "bg-blue-900/60",
-    },
-    {
-      type: "filter",
-      icon: <SlidersHorizontal size={16} className="text-amber-300" />,
-      label: "Filter",
-      description: "Row filter conditions",
-      accent: "bg-amber-900/60",
-    },
-    {
-      type: "marking",
-      icon: <Palette size={16} className="text-purple-300" />,
-      label: "Marking",
-      description: "Color highlight rules",
-      accent: "bg-purple-900/60",
-    },
-    {
-      type: "derivedLogView",
-      icon: <Sparkle size={16} className="text-green-300" />,
-      label: "Output",
-      description: "Derived log view",
-      accent: "bg-green-900/60",
-    },
-    {
-      type: "comment",
-      icon: <MessageSquare size={16} className="text-yellow-300" />,
-      label: "Comment",
-      description: "Add a note",
-      accent: "bg-yellow-900/60",
-    },
-  ] as const;
+  const fileName = currentPath
+    ? (currentPath.split(/[\\/]/).pop() ?? currentPath)
+    : null;
 
   return (
     <div className="relative h-full w-full">
@@ -187,14 +171,29 @@ export default function Canvas() {
         />
       </ReactFlow>
 
-      {/* Floating toolbar */}
-      <ToolBar
-        title="ADD NODE"
-        items={toolbarItems.map((item) => ({
-          ...item,
-          onClick: () => addNode(item.type),
-        }))}
-      />
+      {/* Status bar (top center) */}
+      <div className="pointer-events-none absolute top-0 left-1/2 z-10 -translate-x-1/2 flex items-center gap-1.5 rounded-b-lg border border-t-0 border-neutral-700 bg-neutral-800/95 px-3 py-1 backdrop-blur-sm">
+        <span className="text-xs text-neutral-400">
+          {fileName ?? "new project"}
+        </span>
+        {isDirty && <span className="h-1.5 w-1.5 rounded-full bg-amber-400" />}
+      </div>
+
+      {/* Project toolbar (top right) */}
+      <div className="absolute top-4 right-4 z-10">
+        <ProjectToolbar
+          currentPath={currentPath}
+          isDirty={isDirty}
+          onSave={() => void saveOverwrite()}
+          onSaveAs={() => void saveAs()}
+          onLoad={() => void load()}
+        />
+      </div>
+
+      {/* Add node toolbar (bottom center) */}
+      <div className="absolute bottom-4 left-1/2 z-10 -translate-x-1/2">
+        <AddNodeToolbar onAdd={addNode} />
+      </div>
     </div>
   );
 }

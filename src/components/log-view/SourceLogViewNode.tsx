@@ -10,7 +10,10 @@ import {
 import { commands } from "../../bindings";
 import { useLogView } from "./useLogView";
 import LogViewDisplay from "./LogViewDisplay";
-import { sourceLogViewOutputHandleId } from "../../utils/constraint";
+import {
+  sourceLogViewOutputHandleId,
+  sourceLogViewOutputBottomHandleId,
+} from "../../utils/constraint";
 import type { SourceLogViewData, SourceLogViewNodeType } from "../../types/logView";
 
 export type { SourceLogViewData, SourceLogViewNodeType };
@@ -60,6 +63,11 @@ export default function SourceLogViewNode({
         type="source"
         position={Position.Right}
         id={sourceLogViewOutputHandleId}
+      />
+      <Handle
+        type="source"
+        position={Position.Bottom}
+        id={sourceLogViewOutputBottomHandleId}
       />
 
       <div className="shrink-0 flex items-center gap-2 border-b border-neutral-700 bg-neutral-800 px-3 py-2 cursor-grab active:cursor-grabbing">

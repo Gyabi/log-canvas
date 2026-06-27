@@ -12,7 +12,10 @@ import LogViewDisplay from "./LogViewDisplay";
 import { useDerivedViewSync } from "./useDerivedViewSync";
 import { collectUpstreamChain } from "../../utils/graphTraversal";
 import { computeMarks, EMPTY_MARKS } from "../../utils";
-import { derivedLogViewInputHandleId } from "../../utils/constraint";
+import {
+  derivedLogViewInputHandleId,
+  derivedLogViewInputTopHandleId,
+} from "../../utils/constraint";
 import type { DerivedLogViewData, DerivedLogViewNodeType } from "../../types/logView";
 import type { MarkColor } from "../../utils/constraint";
 
@@ -74,6 +77,11 @@ export default function DerivedLogViewNode({
         type="target"
         position={Position.Left}
         id={derivedLogViewInputHandleId}
+      />
+      <Handle
+        type="target"
+        position={Position.Top}
+        id={derivedLogViewInputTopHandleId}
       />
 
       <div className="shrink-0 flex items-center gap-2 border-b border-violet-800 bg-violet-950 px-3 py-2 cursor-grab active:cursor-grabbing">

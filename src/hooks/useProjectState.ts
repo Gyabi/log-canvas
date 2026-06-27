@@ -186,6 +186,27 @@ export function useProjectState(
   };
 
   const load = async () => {
+    if (isDirtyRef.current) {
+      const wantSave = await ask(
+        "There is an unsaved change. Do you want to save before loading?",
+        {
+          title: "Unsaved Changes",
+          okLabel: "Save and Load",
+          cancelLabel: "Don't Save",
+        }
+      );
+      if (wantSave) {
+        const saved = await saveToPath(currentPathRef.current);
+        if (!saved) return; // 保存キャンセル → 読み込みも中止
+      } else {
+        const confirmLoad = await confirm(
+          "Are you sure you want to discard the changes and load the project?",
+          { title: "Discard Changes", okLabel: "Load", cancelLabel: "Cancel" }
+        );
+        if (!confirmLoad) return;
+      }
+    }
+
     const path = await open({ filters: [PROJECT_FILTER] });
     if (!path) return;
     const result = await commands.loadProject(path);

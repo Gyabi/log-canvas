@@ -47,6 +47,7 @@ export default function LogViewDisplay({
 
   // Scroll metrics used to position row-anchor handles and for CommentNode tracking.
   const [scrollTop, setScrollTop] = useState(0);
+  const [scrollLeft, setScrollLeft] = useState(0);
   const [headerHeight, setHeaderHeight] = useState(30);
   const [scrollContainerHeight, setScrollContainerHeight] = useState(200);
   const [wrapperOffsetTop, setWrapperOffsetTop] = useState(0);
@@ -166,31 +167,39 @@ export default function LogViewDisplay({
     // No position:relative — keeps this wrapper static so the Handle's position:absolute
     // propagates to the React Flow node root (.react-flow__node), same as other handles.
     <div ref={wrapperRef} className="flex flex-col flex-1 min-h-0">
-      {/* Column headers */}
+      {/* Column headers — overflow-x hidden, inner content translated to mirror body scroll */}
       <div
         ref={headerRef}
-        className="nodrag shrink-0 flex items-center border-b border-neutral-700 bg-neutral-800 px-2 py-1 font-mono text-xs text-neutral-500 select-none"
+        className="nodrag shrink-0 overflow-x-hidden border-b border-neutral-700 bg-neutral-800 font-mono text-xs text-neutral-500 select-none"
       >
-        <span className="w-10 shrink-0">#</span>
-        <button
-          onClick={cycleTsMode}
-          className="nodrag w-28 shrink-0 text-left hover:text-neutral-300"
+        <div
+          className="flex items-center px-2 py-1"
+          style={{ transform: `translateX(${-scrollLeft}px)`, width: "max-content", minWidth: "100%" }}
         >
-          {`Timestamp [${TS_LABELS[tsMode as TsMode]}]`}
-        </button>
-        <span className="w-12 shrink-0">ECU</span>
-        <span className="w-12 shrink-0">App</span>
-        <span className="w-12 shrink-0">Ctx</span>
-        <span className="w-16 shrink-0">Level</span>
-        <span className="flex-1">Message</span>
+          <span className="w-10 shrink-0">#</span>
+          <button
+            onClick={cycleTsMode}
+            className="nodrag w-28 shrink-0 text-left hover:text-neutral-300"
+          >
+            {`Timestamp [${TS_LABELS[tsMode as TsMode]}]`}
+          </button>
+          <span className="w-12 shrink-0">ECU</span>
+          <span className="w-12 shrink-0">App</span>
+          <span className="w-12 shrink-0">Ctx</span>
+          <span className="w-16 shrink-0">Level</span>
+          <span className="whitespace-nowrap pl-1">Message</span>
+        </div>
       </div>
 
-      {/* Scrollable body */}
+      {/* Scrollable body — overflow: auto enables both vertical and horizontal scroll */}
       <div
         ref={scrollRef}
-        className="nodrag nowheel flex-1 overflow-y-auto"
+        className="nodrag nowheel flex-1 overflow-auto"
         onClick={clearSelection}
-        onScroll={(e) => setScrollTop(e.currentTarget.scrollTop)}
+        onScroll={(e) => {
+          setScrollTop(e.currentTarget.scrollTop);
+          setScrollLeft(e.currentTarget.scrollLeft);
+        }}
       >
         {rowCount > 0 ? (
           <div style={{ height: virtualizer.getTotalSize(), position: "relative" }}>
@@ -214,7 +223,10 @@ export default function LogViewDisplay({
                     position: "absolute",
                     top: item.start,
                     left: 0,
-                    right: 0,
+                    // width: max-content expands each row to its natural content width.
+                    // minWidth: 100% ensures backgrounds (selection, mark) always fill the viewport.
+                    width: "max-content",
+                    minWidth: "100%",
                     height: item.size,
                   }}
                   className={`flex items-center border-b border-neutral-800 px-2 font-mono text-xs hover:bg-neutral-800 cursor-pointer ${bgClass} ${isAnchored ? "ring-1 ring-inset ring-orange-500" : ""}`}
@@ -239,7 +251,7 @@ export default function LogViewDisplay({
                       <span className={`w-16 shrink-0 font-semibold ${levelClass(row.level)}`}>
                         {row.level}
                       </span>
-                      <span className="flex-1 truncate text-neutral-200">{row.payload}</span>
+                      <span className="whitespace-nowrap pl-1 text-neutral-200">{row.payload}</span>
                     </>
                   ) : (
                     <span className="italic text-neutral-600">…</span>

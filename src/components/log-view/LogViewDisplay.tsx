@@ -203,6 +203,9 @@ export default function LogViewDisplay({
                 : markColor
                   ? MARK_BG[markColor]
                   : "";
+              const isAnchored = rowHandles.some(
+                (a) => item.index >= a.minRow && item.index <= a.maxRow,
+              );
 
               return (
                 <div
@@ -214,7 +217,7 @@ export default function LogViewDisplay({
                     right: 0,
                     height: item.size,
                   }}
-                  className={`flex items-center border-b border-neutral-800 px-2 font-mono text-xs hover:bg-neutral-800 cursor-pointer ${bgClass}`}
+                  className={`flex items-center border-b border-neutral-800 px-2 font-mono text-xs hover:bg-neutral-800 cursor-pointer ${bgClass} ${isAnchored ? "ring-1 ring-inset ring-orange-500" : ""}`}
                   onClick={(e) => {
                     e.stopPropagation();
                     handleRowClick(e, item.index);

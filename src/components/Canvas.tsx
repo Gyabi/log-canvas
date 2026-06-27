@@ -111,6 +111,8 @@ export default function Canvas() {
         },
         data: structuredClone(template.data),
         style: template.style,
+        // Comment nodes must always render above LogView nodes.
+        ...(type === "comment" ? { zIndex: 1000 } : {}),
       },
     ]);
   }

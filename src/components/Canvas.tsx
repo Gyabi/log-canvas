@@ -26,8 +26,8 @@ import {
   NODE_TEMPLATES,
   SINGLE_INPUT_TYPES,
   isRowAnchorHandle,
-  sourceLogViewOutputHandleId,
-  conditionBaseOutputHandleId,
+  isSourceLogViewOutputHandle,
+  isConditionOutputHandle,
 } from "../utils/constraint";
 import type { SourceLogViewData } from "../types/logView";
 import type { DerivedLogViewData } from "../types/logView";
@@ -76,11 +76,11 @@ export default function Canvas() {
     if (isRowAnchorHandle(sh)) return targetType === "comment";
     if (isRowAnchorHandle(th)) return sourceType === "comment";
 
-    if (sh === sourceLogViewOutputHandleId) {
+    if (isSourceLogViewOutputHandle(sh)) {
       return targetType === "filter" || targetType === "marking";
     }
 
-    if (sh === conditionBaseOutputHandleId) {
+    if (isConditionOutputHandle(sh)) {
       return (
         targetType === "filter" ||
         targetType === "marking" ||

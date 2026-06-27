@@ -79,9 +79,21 @@ export const NODE_TEMPLATES = {
 } as const;
 
 export const conditionBaseInputHandleId = "condition-input";
+export const conditionBaseInputTopHandleId = "condition-input-top";
 export const conditionBaseOutputHandleId = "condition-output";
+export const conditionBaseOutputBottomHandleId = "condition-output-bottom";
 export const derivedLogViewInputHandleId = "derived-log-view-input";
+export const derivedLogViewInputTopHandleId = "derived-log-view-input-top";
 export const sourceLogViewOutputHandleId = "source-log-view-output";
+export const sourceLogViewOutputBottomHandleId = "source-log-view-output-bottom";
+
+export function isSourceLogViewOutputHandle(id: string | null | undefined): boolean {
+  return id === sourceLogViewOutputHandleId || id === sourceLogViewOutputBottomHandleId;
+}
+
+export function isConditionOutputHandle(id: string | null | undefined): boolean {
+  return id === conditionBaseOutputHandleId || id === conditionBaseOutputBottomHandleId;
+}
 export const commentNodeTopHandleID = "comment-top";
 export const commentNodeBottomHandleID = "comment-bottom";
 export const commentNodeLeftHandleID = "comment-left";

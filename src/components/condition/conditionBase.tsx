@@ -3,7 +3,9 @@ import { Handle, Position, useReactFlow } from "@xyflow/react";
 import { Copy } from "lucide-react";
 import {
   conditionBaseInputHandleId,
+  conditionBaseInputTopHandleId,
   conditionBaseOutputHandleId,
+  conditionBaseOutputBottomHandleId,
 } from "../../utils/constraint";
 
 export type ConditionBaseProps = {
@@ -49,9 +51,19 @@ export default function ConditionBase({
         id={conditionBaseInputHandleId}
       />
       <Handle
+        type="target"
+        position={Position.Top}
+        id={conditionBaseInputTopHandleId}
+      />
+      <Handle
         type="source"
         position={Position.Right}
         id={conditionBaseOutputHandleId}
+      />
+      <Handle
+        type="source"
+        position={Position.Bottom}
+        id={conditionBaseOutputBottomHandleId}
       />
 
       <div className="flex items-center gap-2 border-b border-neutral-700 bg-neutral-800 rounded-t-lg px-3 py-2">

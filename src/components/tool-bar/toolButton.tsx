@@ -16,7 +16,7 @@ export const ToolButton = ({
   return (
     <button
       onClick={onClick}
-      className={`group flex items-center gap-3 rounded-lg px-3 py-2.5 text-left transition-all hover:bg-neutral-700/60 active:scale-95 active:bg-neutral-700`}
+      className="flex items-center gap-2.5 rounded-lg px-3 py-2 text-left transition-all hover:bg-neutral-700/60 active:scale-95"
     >
       <span
         className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-md ${accent}`}

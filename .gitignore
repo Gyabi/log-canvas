@@ -23,3 +23,5 @@ tools/dlt-sample-gen/samples/*.dlt
 *.njsproj
 *.sln
 *.sw?
+
+*.lcproj

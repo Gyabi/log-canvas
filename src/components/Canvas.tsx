@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import {
   ReactFlow,
   Background,
@@ -12,8 +13,18 @@ import {
   type Edge,
   type Connection,
 } from "@xyflow/react";
-import { FileText, SlidersHorizontal, Palette, Sparkle, MessageSquare } from "lucide-react";
+import {
+  FileText,
+  SlidersHorizontal,
+  Palette,
+  Sparkle,
+  MessageSquare,
+  Save,
+  SaveAll,
+  FolderOpen,
+} from "lucide-react";
 import { commands } from "../bindings";
+import { useProjectState } from "../hooks/useProjectState";
 import SourceLogViewNode from "./log-view/SourceLogViewNode";
 import DerivedLogViewNode from "./log-view/DerivedLogViewNode";
 import FilterNode from "./condition/FilterNode";
@@ -42,6 +53,25 @@ export default function Canvas() {
   const [nodes, setNodes, onNodesChange] = useNodesState<Node>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
 
+  const { currentPath, isDirty, saveAs, saveOverwrite, load } = useProjectState(
+    nodes,
+    edges,
+    setNodes,
+    setEdges
+  );
+
+  // Ctrl+S → overwrite save
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) {
+      if ((e.ctrlKey || e.metaKey) && e.key === "s") {
+        e.preventDefault();
+        void saveOverwrite();
+      }
+    }
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [saveOverwrite]);
+
   function isValidConnection(connection: Edge | Connection): boolean {
     const sourceNode = nodes.find((n) => n.id === connection.source);
     const targetNode = nodes.find((n) => n.id === connection.target);
@@ -63,7 +93,11 @@ export default function Canvas() {
 
     // Condition output → Filter / Marker / DerivedLogView
     if (sh === conditionBaseOutputHandleId) {
-      return targetType === "filter" || targetType === "marking" || targetType === "derivedLogView";
+      return (
+        targetType === "filter" ||
+        targetType === "marking" ||
+        targetType === "derivedLogView"
+      );
     }
 
     // Comment source handles may only target row-anchor handles (already handled above)
@@ -72,7 +106,7 @@ export default function Canvas() {
     // Only one connection per target handle for single-input node types
     if (SINGLE_INPUT_TYPES.has(targetType)) {
       const alreadyConnected = edges.some(
-        (e) => e.target === connection.target && e.targetHandle === th,
+        (e) => e.target === connection.target && e.targetHandle === th
       );
       if (alreadyConnected) return false;
     }
@@ -155,6 +189,10 @@ export default function Canvas() {
     },
   ] as const;
 
+  const fileName = currentPath
+    ? (currentPath.split(/[\\/]/).pop() ?? currentPath)
+    : null;
+
   return (
     <div className="relative h-full w-full">
       <ReactFlow
@@ -187,6 +225,16 @@ export default function Canvas() {
         />
       </ReactFlow>
 
+      {/* Project status bar */}
+      <div className="absolute top-0 left-1/2 -translate-x-1/2 z-10 flex items-center gap-1.5 rounded-b-lg border border-t-0 border-neutral-700 bg-neutral-800/95 px-3 py-1 backdrop-blur-sm">
+        <span className="text-xs text-neutral-400">
+          {fileName ? fileName : "Unsaved Project"}
+        </span>
+        {isDirty && (
+          <span className="text-xs font-semibold text-amber-400">●</span>
+        )}
+      </div>
+
       {/* Floating toolbar */}
       <ToolBar
         title="ADD NODE"
@@ -194,6 +242,37 @@ export default function Canvas() {
           ...item,
           onClick: () => addNode(item.type),
         }))}
+      />
+
+      {/* Project save / load */}
+      <ToolBar
+        title="PROJECT"
+        className="top-auto bottom-4"
+        items={[
+          {
+            icon: <Save size={16} className="text-emerald-300" />,
+            label: "Save",
+            description: currentPath
+              ? "Overwrite (Ctrl+S)"
+              : "Save As (Ctrl+S)",
+            accent: "bg-emerald-900/60",
+            onClick: () => void saveOverwrite(),
+          },
+          {
+            icon: <SaveAll size={16} className="text-teal-300" />,
+            label: "Save As",
+            description: "Save As (Ctrl+Shift+S)",
+            accent: "bg-teal-900/60",
+            onClick: () => void saveAs(),
+          },
+          {
+            icon: <FolderOpen size={16} className="text-sky-300" />,
+            label: "Load",
+            description: "Load Project (Ctrl+O)",
+            accent: "bg-sky-900/60",
+            onClick: () => void load(),
+          },
+        ]}
       />
     </div>
   );

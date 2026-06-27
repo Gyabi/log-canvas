@@ -14,6 +14,8 @@ pub fn create_builder() -> Builder<tauri::Wry> {
         commands::create_view,
         commands::delete_view,
         commands::get_source_row_index,
+        commands::save_project,
+        commands::load_project,
     ])
 }
 

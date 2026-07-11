@@ -14,8 +14,8 @@ export type RowAnchor = {
 export type LogViewScrollState = {
   scrollTop: number;
   scrollContainerHeight: number;
-  wrapperOffsetTop: number;
-  headerHeight: number;
+  /** Distance from the node root to the top of the scroll body (header, search bar, …). */
+  scrollAreaTop: number;
 };
 
 export type SourceLogViewData = {

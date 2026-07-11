@@ -82,10 +82,7 @@ export default function CommentNode({
     return {
       isVisible,
       y: isVisible
-        ? logViewNode.position.y +
-          scrollState.wrapperOffsetTop +
-          scrollState.headerHeight +
-          visibleY
+        ? logViewNode.position.y + scrollState.scrollAreaTop + visibleY
         : null,
     };
   }, [rowEdge, logViewNode, anchor, scrollState]);

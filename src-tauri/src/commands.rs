@@ -186,6 +186,45 @@ pub fn load_project(path: String) -> Result<String, String> {
     std::fs::read_to_string(&path).map_err(|e| e.to_string())
 }
 
+/// Search all rows in a view for `query` (case-insensitive).
+///
+/// Scans `payload`, `ecu_id`, `app_id`, and `ctx_id` fields.
+/// Returns zero-based row indices (within the view) where any field contains the query.
+#[specta::specta]
+#[tauri::command]
+#[allow(clippy::needless_pass_by_value)]
+#[allow(clippy::significant_drop_tightening)]
+pub fn search_rows(
+    view_id: String,
+    query: String,
+    state: State<'_, AppState>,
+) -> Result<Vec<u32>, String> {
+    if query.is_empty() {
+        return Ok(vec![]);
+    }
+    let query_lower = query.to_lowercase();
+    let (path, all_offsets) = {
+        let files = state.dlt_files.lock().map_err(|e| format!("lock poisoned: {e}"))?;
+        let views = state.dlt_views.lock().map_err(|e| format!("lock poisoned: {e}"))?;
+        resolve_view(&view_id, &files, &views)?
+    };
+    let mut file = File::open(&path).map_err(|e| format!("cannot open file: {e}"))?;
+    let mut matches = Vec::new();
+    for (i, &offset) in all_offsets.iter().enumerate() {
+        let row_index = u32::try_from(i).unwrap_or(u32::MAX);
+        if let Ok(row) = dlt_parser::parse_row_at(&mut file, offset, row_index) {
+            if row.payload.to_lowercase().contains(&query_lower)
+                || row.ecu_id.to_lowercase().contains(&query_lower)
+                || row.app_id.to_lowercase().contains(&query_lower)
+                || row.ctx_id.to_lowercase().contains(&query_lower)
+            {
+                matches.push(row_index);
+            }
+        }
+    }
+    Ok(matches)
+}
+
 /// Given a derived view and a zero-based row index within it, return the
 /// corresponding zero-based row index in `source_view_id`.
 ///

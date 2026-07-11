@@ -1,6 +1,7 @@
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Handle, Position, useReactFlow, useUpdateNodeInternals } from "@xyflow/react";
 import type { useLogView } from "./useLogView";
+import { useSearch } from "./useSearch";
 import type { DltRow } from "../../bindings";
 import { MARK_BG, ROW_HEIGHT } from "../../utils/constraint";
 import type { MarkColor } from "../../utils/constraint";
@@ -22,7 +23,32 @@ type Props = ReturnType<typeof useLogView> & {
   nodeId: string;
 };
 
+function HighlightedText({ text, query }: { text: string; query: string }) {
+  if (!query) return <>{text}</>;
+  const qLower = query.toLowerCase();
+  const lower = text.toLowerCase();
+  const parts: React.ReactNode[] = [];
+  let pos = 0;
+  let key = 0;
+  while (pos < text.length) {
+    const idx = lower.indexOf(qLower, pos);
+    if (idx === -1) {
+      parts.push(text.slice(pos));
+      break;
+    }
+    if (idx > pos) parts.push(text.slice(pos, idx));
+    parts.push(
+      <span key={key++} className="bg-yellow-400/80 text-neutral-900 rounded-[2px]">
+        {text.slice(idx, idx + query.length)}
+      </span>
+    );
+    pos = idx + query.length;
+  }
+  return <>{parts}</>;
+}
+
 export default function LogViewDisplay({
+  viewId,
   virtualizer,
   scrollRef,
   rowCache,
@@ -42,68 +68,106 @@ export default function LogViewDisplay({
   const { updateNodeData } = useReactFlow();
   const updateNodeInternals = useUpdateNodeInternals();
 
+  const search = useSearch(viewId, scrollToIndex);
+  const searchInputRef = useRef<HTMLInputElement>(null);
+
   const [jumpInputVisible, setJumpInputVisible] = useState(false);
   const [jumpValue, setJumpValue] = useState("");
 
-  // Scroll metrics used to position row-anchor handles and for CommentNode tracking.
   const [scrollTop, setScrollTop] = useState(0);
   const [scrollLeft, setScrollLeft] = useState(0);
-  const [headerHeight, setHeaderHeight] = useState(30);
+  // Distance from the node root to the top of the scroll body. Measured directly
+  // from the scroll element so anything rendered above it (column header, search
+  // bar) is accounted for automatically.
+  const [scrollAreaTop, setScrollAreaTop] = useState(0);
   const [scrollContainerHeight, setScrollContainerHeight] = useState(200);
-  const [wrapperOffsetTop, setWrapperOffsetTop] = useState(0);
 
   const wrapperRef = useRef<HTMLDivElement>(null);
   const headerRef = useRef<HTMLDivElement>(null);
 
-  // Measure wrapperOffsetTop synchronously to avoid a flash of wrong handle position.
-  useLayoutEffect(() => {
-    if (wrapperRef.current) setWrapperOffsetTop(wrapperRef.current.offsetTop);
-  }, []);
+  // offsetParent of the scroll body is the React Flow node root (every ancestor
+  // in between is position:static), so offsetTop is relative to the node root.
+  const measureScrollAreaTop = () => {
+    if (scrollRef.current) setScrollAreaTop(scrollRef.current.offsetTop);
+  };
 
-  // Track column-header height.
+  // Re-measure synchronously when the search bar mounts/unmounts to avoid a
+  // one-frame flash of wrong handle position.
+  useLayoutEffect(() => {
+    measureScrollAreaTop();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [search.searchVisible]);
+
+  // Header height changes (e.g. wrapping) shift the scroll body down.
   useEffect(() => {
     const el = headerRef.current;
     if (!el) return;
-    const obs = new ResizeObserver(() => setHeaderHeight(el.offsetHeight));
+    const obs = new ResizeObserver(measureScrollAreaTop);
     obs.observe(el);
-    setHeaderHeight(el.offsetHeight);
     return () => obs.disconnect();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Track scroll-body height.
   useEffect(() => {
     const el = scrollRef.current;
     if (!el) return;
-    const obs = new ResizeObserver(() => setScrollContainerHeight(el.clientHeight));
+    const obs = new ResizeObserver(() => {
+      setScrollContainerHeight(el.clientHeight);
+      measureScrollAreaTop();
+    });
     obs.observe(el);
     setScrollContainerHeight(el.clientHeight);
     return () => obs.disconnect();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scrollRef]);
 
-  // Sync scroll state to node data so connected CommentNodes can track positions.
   const prevScrollStateRef = useRef<LogViewScrollState | null>(null);
   useEffect(() => {
-    const next: LogViewScrollState = { scrollTop, scrollContainerHeight, wrapperOffsetTop, headerHeight };
+    const next: LogViewScrollState = { scrollTop, scrollContainerHeight, scrollAreaTop };
     const prev = prevScrollStateRef.current;
     if (
       prev &&
       prev.scrollTop === next.scrollTop &&
       prev.scrollContainerHeight === next.scrollContainerHeight &&
-      prev.wrapperOffsetTop === next.wrapperOffsetTop &&
-      prev.headerHeight === next.headerHeight
+      prev.scrollAreaTop === next.scrollAreaTop
     ) return;
     prevScrollStateRef.current = next;
     updateNodeData(nodeId, { scrollState: next });
-  }, [scrollTop, scrollContainerHeight, wrapperOffsetTop, headerHeight, nodeId, updateNodeData]);
+  }, [scrollTop, scrollContainerHeight, scrollAreaTop, nodeId, updateNodeData]);
 
-  // Row-anchor handle management (multiple handles, pending + connected).
   const rowHandles = useRowHandles(nodeId, selectedRows);
 
-  // Keep React Flow in sync whenever scroll moves handles.
   const rowHandleCount = rowHandles.length;
   useEffect(() => {
     if (rowHandleCount > 0) updateNodeInternals(nodeId);
-  }, [scrollTop, headerHeight, rowHandleCount, nodeId, updateNodeInternals]);
+  }, [scrollTop, scrollAreaTop, rowHandleCount, nodeId, updateNodeInternals]);
+
+  // Focus search input when search bar opens.
+  useEffect(() => {
+    if (search.searchVisible) {
+      searchInputRef.current?.focus();
+    }
+  }, [search.searchVisible]);
+
+  // Ctrl+F opens search when focus is within this node.
+  const { openSearch } = search;
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) {
+      if ((e.ctrlKey || e.metaKey) && e.key === "f") {
+        if (wrapperRef.current?.contains(e.target as Node)) {
+          e.preventDefault();
+          e.stopPropagation();
+          openSearch();
+        }
+      }
+    }
+    window.addEventListener("keydown", onKeyDown, true);
+    return () => window.removeEventListener("keydown", onKeyDown, true);
+  }, [openSearch]);
+
+  const matchSet = useMemo(() => new Set(search.matchIndices), [search.matchIndices]);
+  const currentMatchRow =
+    search.currentMatchPos >= 0 ? search.matchIndices[search.currentMatchPos] : -1;
 
   const virtualItems = virtualizer.getVirtualItems();
 
@@ -151,23 +215,35 @@ export default function LogViewDisplay({
     }
   }
 
-  /**
-   * Compute the handle's top position (px from the React Flow node root) for a given anchor.
-   * Returns null when the anchor row is scrolled out of view and no edge is connected.
-   */
+  function handleSearchKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      if (e.shiftKey) search.prevMatch();
+      else search.nextMatch();
+    } else if (e.key === "Escape") {
+      search.closeSearch();
+    }
+  }
+
   function anchorTopPx(anchor: RowAnchor): number | null {
-    const scrollAreaTop = wrapperOffsetTop + headerHeight;
     const midContent = ((anchor.minRow + anchor.maxRow + 1) / 2) * ROW_HEIGHT;
     const midVisible = midContent - scrollTop;
     if (midVisible < 0 || midVisible > scrollContainerHeight) return null;
     return scrollAreaTop + midVisible;
   }
 
+  const matchLabel =
+    search.isSearching
+      ? "..."
+      : search.query && search.matchIndices.length === 0
+        ? "no match"
+        : search.matchIndices.length > 0
+          ? `${search.currentMatchPos + 1} / ${search.matchIndices.length}`
+          : "";
+
   return (
-    // No position:relative — keeps this wrapper static so the Handle's position:absolute
-    // propagates to the React Flow node root (.react-flow__node), same as other handles.
     <div ref={wrapperRef} className="flex flex-col flex-1 min-h-0">
-      {/* Column headers — overflow-x hidden, inner content translated to mirror body scroll */}
+      {/* Column headers */}
       <div
         ref={headerRef}
         className="nodrag shrink-0 overflow-x-hidden border-b border-neutral-700 bg-neutral-800 font-mono text-xs text-neutral-500 select-none"
@@ -191,7 +267,45 @@ export default function LogViewDisplay({
         </div>
       </div>
 
-      {/* Scrollable body — overflow: auto enables both vertical and horizontal scroll */}
+      {/* Search bar */}
+      {search.searchVisible && (
+        <div className="nodrag shrink-0 flex items-center gap-1.5 border-b border-neutral-700 bg-neutral-850 bg-neutral-900 px-2 py-1">
+          <input
+            ref={searchInputRef}
+            type="text"
+            value={search.query}
+            onChange={(e) => search.setQuery(e.target.value)}
+            onKeyDown={handleSearchKeyDown}
+            placeholder="search..."
+            className="min-w-0 flex-1 rounded bg-neutral-700 px-2 py-0.5 font-mono text-xs text-neutral-200 outline-none placeholder:text-neutral-500 focus:ring-1 focus:ring-neutral-500"
+          />
+          <span className="shrink-0 w-16 text-right font-mono text-xs text-neutral-400">
+            {matchLabel}
+          </span>
+          <button
+            onClick={search.prevMatch}
+            disabled={search.matchIndices.length === 0}
+            className="shrink-0 rounded px-1.5 py-0.5 text-xs text-neutral-400 hover:bg-neutral-700 hover:text-neutral-200 disabled:opacity-30"
+          >
+            ▲
+          </button>
+          <button
+            onClick={search.nextMatch}
+            disabled={search.matchIndices.length === 0}
+            className="shrink-0 rounded px-1.5 py-0.5 text-xs text-neutral-400 hover:bg-neutral-700 hover:text-neutral-200 disabled:opacity-30"
+          >
+            ▼
+          </button>
+          <button
+            onClick={search.closeSearch}
+            className="shrink-0 rounded px-1.5 py-0.5 text-xs text-neutral-400 hover:bg-neutral-700 hover:text-neutral-200"
+          >
+            ×
+          </button>
+        </div>
+      )}
+
+      {/* Scrollable body */}
       <div
         ref={scrollRef}
         className="nodrag nowheel flex-1 overflow-auto"
@@ -207,11 +321,17 @@ export default function LogViewDisplay({
               const row = rowCache.get(item.index);
               const isSelected = selectedRows.has(item.index);
               const markColor = marks?.get(item.index);
+              const isCurrentMatch = item.index === currentMatchRow;
+              const isMatch = matchSet.has(item.index);
               const bgClass = isSelected
                 ? "bg-blue-900/40"
-                : markColor
-                  ? MARK_BG[markColor]
-                  : "";
+                : isCurrentMatch
+                  ? "bg-yellow-700/40"
+                  : isMatch
+                    ? "bg-yellow-900/20"
+                    : markColor
+                      ? MARK_BG[markColor]
+                      : "";
               const isAnchored = rowHandles.some(
                 (a) => item.index >= a.minRow && item.index <= a.maxRow,
               );
@@ -223,8 +343,6 @@ export default function LogViewDisplay({
                     position: "absolute",
                     top: item.start,
                     left: 0,
-                    // width: max-content expands each row to its natural content width.
-                    // minWidth: 100% ensures backgrounds (selection, mark) always fill the viewport.
                     width: "max-content",
                     minWidth: "100%",
                     height: item.size,
@@ -245,13 +363,21 @@ export default function LogViewDisplay({
                       <span className="w-28 shrink-0 text-neutral-400">
                         {formatTs(row.timestampUs, tsMode, firstTimestampUs)}
                       </span>
-                      <span className="w-12 shrink-0 text-sky-400">{row.ecuId}</span>
-                      <span className="w-12 shrink-0 text-emerald-400">{row.appId}</span>
-                      <span className="w-12 shrink-0 text-amber-400">{row.ctxId}</span>
+                      <span className="w-12 shrink-0 text-sky-400">
+                        <HighlightedText text={row.ecuId} query={search.query} />
+                      </span>
+                      <span className="w-12 shrink-0 text-emerald-400">
+                        <HighlightedText text={row.appId} query={search.query} />
+                      </span>
+                      <span className="w-12 shrink-0 text-amber-400">
+                        <HighlightedText text={row.ctxId} query={search.query} />
+                      </span>
                       <span className={`w-16 shrink-0 font-semibold ${levelClass(row.level)}`}>
                         {row.level}
                       </span>
-                      <span className="whitespace-nowrap pl-1 text-neutral-200">{row.payload}</span>
+                      <span className="whitespace-nowrap pl-1 text-neutral-200">
+                        <HighlightedText text={row.payload} query={search.query} />
+                      </span>
                     </>
                   ) : (
                     <span className="italic text-neutral-600">…</span>
@@ -269,7 +395,7 @@ export default function LogViewDisplay({
 
       {/* Footer */}
       <div className="nodrag shrink-0 flex items-center justify-between border-t border-neutral-700 bg-neutral-800 px-3 py-1 text-xs text-neutral-500">
-        <span>
+        <span className="flex items-center gap-2">
           {selectedRows.size > 0 && (
             <button
               onClick={copySelected}
@@ -278,6 +404,13 @@ export default function LogViewDisplay({
               {`copy (${selectedRows.size})`}
             </button>
           )}
+          <button
+            onClick={search.openSearch}
+            className="hover:text-neutral-300"
+            title="Search (Ctrl+F)"
+          >
+            search
+          </button>
         </span>
         {jumpInputVisible ? (
           <input
@@ -303,8 +436,7 @@ export default function LogViewDisplay({
         )}
       </div>
 
-      {/* Row-anchor handles — one per connected/pending anchor. position:absolute
-          propagates to the React Flow node root because this wrapper is position:static. */}
+      {/* Row-anchor handles */}
       {rowHandles.map((anchor) => {
         const top = anchorTopPx(anchor);
         if (top === null) return null;

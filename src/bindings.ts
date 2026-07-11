@@ -51,6 +51,13 @@ export const commands = {
 	 *  Used by the UI to jump to the matching row in a parent view on double-click.
 	 */
 	getSourceRowIndex: (derivedViewId: string, derivedRowIndex: number, sourceViewId: string) => typedError<number, string>(__TAURI_INVOKE("get_source_row_index", { derivedViewId, derivedRowIndex, sourceViewId })),
+	/**
+	 *  Search all rows in a view for `query` (case-insensitive).
+	 * 
+	 *  Scans `payload`, `ecu_id`, `app_id`, and `ctx_id` fields.
+	 *  Returns zero-based row indices (within the view) where any field contains the query.
+	 */
+	searchRows: (viewId: string, query: string) => typedError<number[], string>(__TAURI_INVOKE("search_rows", { viewId, query })),
 	/**  Write `json` to `path`, creating or overwriting the file. */
 	saveProject: (path: string, json: string) => typedError<null, string>(__TAURI_INVOKE("save_project", { path, json })),
 	/**  Read the file at `path` and return its contents as a UTF-8 string. */

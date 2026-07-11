@@ -116,6 +116,7 @@ export function useLogView(viewId: string | undefined, rowCount: number) {
   }
 
   return {
+    viewId,
     virtualizer,
     scrollRef,
     rowCache: cacheState.entries,
